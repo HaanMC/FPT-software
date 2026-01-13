@@ -89,19 +89,38 @@ export interface QuizData {
   questions: QuizQuestion[];
 }
 
-// --- New Types needed for fixes ---
-export type AppScreen = 'home' | 'quiz' | 'stats' | 'settings' | 'shop' | 'coach' | 'flashcards';
+// --- Focus App Types ---
+export type AppScreen = 'home' | 'timer' | 'quiz' | 'break' | 'stats' | 'settings' | 'shop' | 'coach' | 'flashcards';
 
+// Timer states for the focus session
+export type TimerState = 'idle' | 'running' | 'paused' | 'completed';
+
+// Quiz result states
+export type QuizResultState = 'pending' | 'passed' | 'failed' | 'retry_passed' | 'retry_failed';
+
+// Session configuration for starting a focus session
 export interface SessionConfig {
   subject: string;
   focusMinutes: number;
   breakMinutes: number;
 }
 
+// User statistics tracked in localStorage
 export interface UserStats {
   totalFocusMinutes: number;
   sessionsCompleted: number;
   averageQuizScore: number;
   streakDays: number;
-  history: { date: string; minutes: number }[];
+  lastSessionDate: string; // ISO date for streak calculation
+  history: { date: string; minutes: number }[]; // Last 7 days activity
+}
+
+// Quiz session state for tracking user answers and retry logic
+export interface QuizSession {
+  quizData: QuizData;
+  answers: Record<number, string>;
+  score: number;
+  submitted: boolean;
+  isRetry: boolean;
+  incorrectQuestions: QuizQuestion[];
 }

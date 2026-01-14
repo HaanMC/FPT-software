@@ -6,6 +6,7 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGlobal } from '../context/GlobalContext';
+import { useT, useLanguage } from '../i18n';
 import { Card, StatCard, Button, Badge, Progress, EmptyState } from '../components/ui';
 import {
   Timer,
@@ -20,22 +21,48 @@ import {
   Flame,
   BookOpen,
   Brain,
-  Inbox,
+  ListTodo,
+  FileText,
+  Plus,
 } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { state, getActiveCycle } = useGlobal();
+  const { state, getActiveCycle, addNote } = useGlobal();
+  const t = useT();
+  const language = useLanguage();
 
   const today = new Date().toISOString().split('T')[0];
+
+  // Get greeting based on time of day
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return t.dashboard.greetingMorning;
+    if (hour < 17) return t.dashboard.greetingAfternoon;
+    return t.dashboard.greetingEvening;
+  }, [t]);
+
+  // Format current date
+  const formattedDate = useMemo(() => {
+    return new Date().toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+    });
+  }, [language]);
 
   // Calculate stats
   const stats = useMemo(() => {
     // Today's tasks
     const todayTasks = state.tasks.filter(
-      (t) => t.status !== 'done' && t.dueDate === today
+      (task) => task.status !== 'done' && task.dueDate === today
     );
-    const inProgressTasks = state.tasks.filter((t) => t.status === 'in_progress');
+    const inProgressTasks = state.tasks.filter((task) => task.status === 'in_progress');
+
+    // Today's todos (not done)
+    const todayTodos = state.todos
+      .filter((todo) => !todo.done)
+      .slice(0, 5);
 
     // Due flashcards
     const dueCards = state.decks.reduce((acc, deck) => {
@@ -92,6 +119,7 @@ export const DashboardPage: React.FC = () => {
     return {
       todayTasks,
       inProgressTasks,
+      todayTodos,
       dueCards,
       todayMinutes: Math.round(todayMinutes),
       weekMinutes: Math.round(weekMinutes),
@@ -106,8 +134,8 @@ export const DashboardPage: React.FC = () => {
   // Cycle progress
   const cycleProgress = useMemo(() => {
     if (!activeCycle) return { completed: 0, total: 0, percent: 0 };
-    const cycleTasks = state.tasks.filter((t) => t.cycleId === activeCycle.id);
-    const completed = cycleTasks.filter((t) => t.status === 'done').length;
+    const cycleTasks = state.tasks.filter((task) => task.cycleId === activeCycle.id);
+    const completed = cycleTasks.filter((task) => task.status === 'done').length;
     return {
       completed,
       total: cycleTasks.length,
@@ -121,43 +149,48 @@ export const DashboardPage: React.FC = () => {
     .slice(-5)
     .reverse();
 
+  // Handle quick note
+  const handleQuickNote = () => {
+    navigate('/notes');
+  };
+
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       {/* Welcome Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}
+            {greeting}
           </h1>
           <p className="text-gray-500 mt-1">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            {formattedDate}
           </p>
         </div>
         <Button onClick={() => navigate('/timer')}>
           <Play className="w-4 h-4" />
-          Start Focus Session
+          {t.dashboard.startFocusSession}
         </Button>
       </div>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
-          label="Today's Focus"
-          value={`${stats.todayMinutes} min`}
+          label={t.dashboard.todaysFocus}
+          value={`${stats.todayMinutes} ${t.common.min}`}
           icon={<Timer className="w-5 h-5" />}
         />
         <StatCard
-          label="Current Streak"
-          value={`${stats.streak} days`}
+          label={t.dashboard.currentStreak}
+          value={`${stats.streak} ${t.common.days}`}
           icon={<Flame className="w-5 h-5 text-orange-500" />}
         />
         <StatCard
-          label="Cards Due"
+          label={t.dashboard.cardsDue}
           value={stats.dueCards}
           icon={<GraduationCap className="w-5 h-5" />}
         />
         <StatCard
-          label="Avg Quiz Score"
+          label={t.dashboard.avgQuizScore}
           value={`${stats.avgQuizScore}%`}
           icon={<Target className="w-5 h-5" />}
         />
@@ -165,46 +198,44 @@ export const DashboardPage: React.FC = () => {
 
       {/* Main Grid */}
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Today's Tasks */}
+        {/* Today's Todos */}
         <Card className="p-4">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-              <CheckSquare className="w-4 h-4 text-indigo-600" />
-              Today's Tasks
+              <ListTodo className="w-4 h-4 text-indigo-600" />
+              {t.dashboard.todoToday}
             </h2>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/tasks')}>
-              View All
+            <Button variant="ghost" size="sm" onClick={() => navigate('/todo')}>
+              {t.dashboard.viewAll}
               <ArrowRight className="w-3 h-3" />
             </Button>
           </div>
 
-          {stats.todayTasks.length === 0 && stats.inProgressTasks.length === 0 ? (
+          {stats.todayTodos.length === 0 ? (
             <EmptyState
-              icon={<CheckSquare className="w-12 h-12" />}
-              title="No tasks for today"
-              description="Add tasks with due dates to see them here"
-              action={{ label: 'Add Task', onClick: () => navigate('/tasks') }}
+              icon={<ListTodo className="w-12 h-12" />}
+              title={t.dashboard.noTodosToday}
+              description={t.dashboard.addFirstTodo}
+              action={{ label: t.todo.addFirstTodo, onClick: () => navigate('/todo') }}
             />
           ) : (
             <div className="space-y-2">
-              {[...stats.inProgressTasks, ...stats.todayTasks].slice(0, 5).map((task) => (
+              {stats.todayTodos.map((todo) => (
                 <div
-                  key={task.id}
+                  key={todo.id}
                   className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 cursor-pointer"
-                  onClick={() => navigate('/tasks')}
+                  onClick={() => navigate('/todo')}
                 >
-                  <div
-                    className={`w-2 h-2 rounded-full ${
-                      task.status === 'in_progress' ? 'bg-amber-500' : 'bg-gray-300'
-                    }`}
-                  />
-                  <span className="flex-1 text-sm truncate">{task.title}</span>
-                  <Badge
-                    variant={task.priority === 'urgent' ? 'danger' : task.priority === 'high' ? 'warning' : 'default'}
-                    size="sm"
-                  >
-                    {task.priority}
-                  </Badge>
+                  <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                  <span className="flex-1 text-sm truncate">{todo.title}</span>
+                  {todo.priority !== 'medium' && (
+                    <Badge
+                      variant={todo.priority === 'urgent' ? 'danger' : todo.priority === 'high' ? 'warning' : 'default'}
+                      size="sm"
+                    >
+                      {t.todo.priority[todo.priority]}
+                    </Badge>
+                  )}
                 </div>
               ))}
             </div>
@@ -216,10 +247,10 @@ export const DashboardPage: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
               <GraduationCap className="w-4 h-4 text-green-600" />
-              Flashcard Review
+              {t.dashboard.flashcardReview}
             </h2>
             <Button variant="ghost" size="sm" onClick={() => navigate('/flashcards')}>
-              Review
+              {t.common.review}
               <ArrowRight className="w-3 h-3" />
             </Button>
           </div>
@@ -227,18 +258,18 @@ export const DashboardPage: React.FC = () => {
           {stats.dueCards === 0 ? (
             <EmptyState
               icon={<Brain className="w-12 h-12" />}
-              title="All caught up!"
-              description="No flashcards due for review today"
+              title={t.dashboard.allCaughtUp}
+              description={t.dashboard.noFlashcardsDue}
             />
           ) : (
             <div className="space-y-4">
               <div className="text-center py-4">
                 <p className="text-4xl font-bold text-green-600">{stats.dueCards}</p>
-                <p className="text-sm text-gray-500">cards due today</p>
+                <p className="text-sm text-gray-500">{t.dashboard.cardsDueToday}</p>
               </div>
               <Button fullWidth onClick={() => navigate('/flashcards')}>
                 <BookOpen className="w-4 h-4" />
-                Start Review Session
+                {t.dashboard.startReviewSession}
               </Button>
             </div>
           )}
@@ -249,10 +280,10 @@ export const DashboardPage: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
               <Calendar className="w-4 h-4 text-purple-600" />
-              Current Cycle
+              {t.dashboard.currentCycle}
             </h2>
             <Button variant="ghost" size="sm" onClick={() => navigate('/projects')}>
-              Manage
+              {t.dashboard.manage}
               <ArrowRight className="w-3 h-3" />
             </Button>
           </div>
@@ -262,14 +293,14 @@ export const DashboardPage: React.FC = () => {
               <div>
                 <p className="font-medium">{activeCycle.name}</p>
                 <p className="text-xs text-gray-500">
-                  {new Date(activeCycle.startDate).toLocaleDateString()} -{' '}
-                  {new Date(activeCycle.endDate).toLocaleDateString()}
+                  {new Date(activeCycle.startDate).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US')} -{' '}
+                  {new Date(activeCycle.endDate).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US')}
                 </p>
               </div>
               <div>
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600">Progress</span>
-                  <span className="font-medium">{cycleProgress.completed}/{cycleProgress.total} tasks</span>
+                  <span className="text-gray-600">{t.dashboard.progress}</span>
+                  <span className="font-medium">{cycleProgress.completed}/{cycleProgress.total} {t.dashboard.tasks}</span>
                 </div>
                 <Progress value={cycleProgress.percent} />
               </div>
@@ -277,51 +308,35 @@ export const DashboardPage: React.FC = () => {
           ) : (
             <EmptyState
               icon={<Calendar className="w-12 h-12" />}
-              title="No active cycle"
-              description="Create a weekly cycle to track your sprint"
+              title={t.dashboard.noActiveCycle}
+              description={t.dashboard.createCycleDesc}
             />
           )}
         </Card>
 
-        {/* Inbox */}
+        {/* Quick Note */}
         <Card className="p-4">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-              <Inbox className="w-4 h-4 text-blue-600" />
-              Inbox
-              {state.inbox.length > 0 && (
-                <Badge variant="primary">{state.inbox.length}</Badge>
-              )}
+              <FileText className="w-4 h-4 text-blue-600" />
+              {t.dashboard.quickNoteCapture}
             </h2>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/inbox')}>
-              Triage
+            <Button variant="ghost" size="sm" onClick={() => navigate('/notes')}>
+              {t.dashboard.viewAll}
               <ArrowRight className="w-3 h-3" />
             </Button>
           </div>
 
-          {state.inbox.length === 0 ? (
-            <EmptyState
-              icon={<Inbox className="w-12 h-12" />}
-              title="Inbox zero!"
-              description="Quick captures will appear here"
-            />
-          ) : (
-            <div className="space-y-2">
-              {state.inbox.slice(0, 4).map((item) => (
-                <div
-                  key={item.id}
-                  className="p-2 bg-gray-50 rounded-md text-sm truncate"
-                >
-                  {item.content}
-                </div>
-              ))}
-              {state.inbox.length > 4 && (
-                <p className="text-xs text-gray-500 text-center">
-                  +{state.inbox.length - 4} more items
-                </p>
-              )}
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">{t.notes.subtitle}</p>
+            <Button fullWidth variant="outline" onClick={handleQuickNote}>
+              <Plus className="w-4 h-4" />
+              {t.notes.newNote}
+            </Button>
+            <div className="text-center text-sm text-gray-400">
+              {state.notes.length} {t.notes.title.toLowerCase()}
             </div>
-          )}
+          </div>
         </Card>
       </div>
 
@@ -330,10 +345,10 @@ export const DashboardPage: React.FC = () => {
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold text-gray-900 flex items-center gap-2">
             <Clock className="w-4 h-4 text-gray-600" />
-            Recent Sessions
+            {t.dashboard.recentSessions}
           </h2>
           <Button variant="ghost" size="sm" onClick={() => navigate('/sessions')}>
-            View All
+            {t.dashboard.viewAll}
             <ArrowRight className="w-3 h-3" />
           </Button>
         </div>
@@ -341,9 +356,9 @@ export const DashboardPage: React.FC = () => {
         {recentSessions.length === 0 ? (
           <EmptyState
             icon={<Timer className="w-12 h-12" />}
-            title="No sessions yet"
-            description="Start a focus session to begin tracking your progress"
-            action={{ label: 'Start Session', onClick: () => navigate('/timer') }}
+            title={t.dashboard.noSessionsYet}
+            description={t.dashboard.startSessionDesc}
+            action={{ label: t.dashboard.startSession, onClick: () => navigate('/timer') }}
           />
         ) : (
           <div className="grid md:grid-cols-5 gap-3">
@@ -354,11 +369,11 @@ export const DashboardPage: React.FC = () => {
                 onClick={() => navigate('/sessions')}
               >
                 <p className="text-lg font-bold text-gray-900">
-                  {Math.round(session.durationSeconds / 60)}m
+                  {Math.round(session.durationSeconds / 60)}{t.common.min}
                 </p>
                 <p className="text-xs text-gray-500">{session.subject}</p>
                 <p className="text-xs text-gray-400 mt-1">
-                  {new Date(session.startTime).toLocaleDateString('en-US', { weekday: 'short' })}
+                  {new Date(session.startTime).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US', { weekday: 'short' })}
                 </p>
               </div>
             ))}
@@ -372,14 +387,14 @@ export const DashboardPage: React.FC = () => {
           <div>
             <h2 className="font-semibold text-gray-900 flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-indigo-600" />
-              This Week
+              {t.dashboard.thisWeek}
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              {stats.weekMinutes} minutes focused across {stats.totalSessions} sessions
+              {stats.weekMinutes} {t.dashboard.minutesFocused} {stats.totalSessions} {t.dashboard.sessionsText}
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={() => navigate('/analytics')}>
-            View Analytics
+            {t.dashboard.viewAnalytics}
           </Button>
         </div>
       </Card>

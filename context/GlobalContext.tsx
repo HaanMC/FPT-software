@@ -20,6 +20,8 @@ import {
   ChatMessage,
   Language,
   Theme,
+  TodoItem,
+  TodoPriority,
 } from '../types';
 import { LanguageContext } from '../i18n';
 import { loadState, saveState, generateId } from '../lib/storage/store';
@@ -61,6 +63,13 @@ interface GlobalContextType {
   convertInboxToTask: (id: string, taskData: Partial<Task>) => Task;
   convertInboxToNote: (id: string, noteData: Partial<Note>) => Note;
   archiveInboxItem: (id: string) => void;
+
+  // Todos
+  addTodo: (title: string, options?: { dueDate?: string; subjectId?: string; priority?: TodoPriority }) => TodoItem;
+  updateTodo: (id: string, updates: Partial<TodoItem>) => void;
+  deleteTodo: (id: string) => void;
+  toggleTodo: (id: string) => void;
+  clearCompletedTodos: () => void;
 
   // Decks
   addDeck: (deck: Omit<FlashcardDeck, 'id' | 'createdAt' | 'lastReviewedAt'>) => void;
@@ -354,6 +363,60 @@ export const GlobalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   // ============================================
+  // Todo Operations
+  // ============================================
+  const addTodo = useCallback(
+    (title: string, options?: { dueDate?: string; subjectId?: string; priority?: TodoPriority }): TodoItem => {
+      const now = new Date().toISOString();
+      const todo: TodoItem = {
+        id: generateId('todo'),
+        title,
+        done: false,
+        createdAt: now,
+        updatedAt: now,
+        dueDate: options?.dueDate || null,
+        subjectId: options?.subjectId || null,
+        priority: options?.priority || 'medium',
+      };
+      setState((prev) => ({ ...prev, todos: [...prev.todos, todo] }));
+      return todo;
+    },
+    []
+  );
+
+  const updateTodo = useCallback((id: string, updates: Partial<TodoItem>) => {
+    setState((prev) => ({
+      ...prev,
+      todos: prev.todos.map((t) =>
+        t.id === id ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t
+      ),
+    }));
+  }, []);
+
+  const deleteTodo = useCallback((id: string) => {
+    setState((prev) => ({
+      ...prev,
+      todos: prev.todos.filter((t) => t.id !== id),
+    }));
+  }, []);
+
+  const toggleTodo = useCallback((id: string) => {
+    setState((prev) => ({
+      ...prev,
+      todos: prev.todos.map((t) =>
+        t.id === id ? { ...t, done: !t.done, updatedAt: new Date().toISOString() } : t
+      ),
+    }));
+  }, []);
+
+  const clearCompletedTodos = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      todos: prev.todos.filter((t) => !t.done),
+    }));
+  }, []);
+
+  // ============================================
   // Deck Operations
   // ============================================
   const addDeck = useCallback(
@@ -623,6 +686,11 @@ export const GlobalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     convertInboxToTask,
     convertInboxToNote,
     archiveInboxItem,
+    addTodo,
+    updateTodo,
+    deleteTodo,
+    toggleTodo,
+    clearCompletedTodos,
     addDeck,
     updateDeck,
     deleteDeck,

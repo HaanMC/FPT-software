@@ -15,6 +15,7 @@ export const vi: TranslationKeys = {
   nav: {
     dashboard: 'Trang chủ',
     inbox: 'Hộp thư',
+    todo: 'Việc cần làm',
     tasks: 'Công việc',
     projects: 'Dự án',
     notes: 'Ghi chú',
@@ -32,6 +33,9 @@ export const vi: TranslationKeys = {
     title: 'Trang chủ',
     subtitle: 'Tổng quan học tập',
     greeting: 'Chào mừng trở lại',
+    greetingMorning: 'Chào buổi sáng',
+    greetingAfternoon: 'Chào buổi chiều',
+    greetingEvening: 'Chào buổi tối',
     todaysTasks: 'Công việc hôm nay',
     recentSessions: 'Phiên gần đây',
     quickStats: 'Thống kê nhanh',
@@ -39,6 +43,42 @@ export const vi: TranslationKeys = {
     tasksCompleted: 'Việc hoàn thành',
     streakDays: 'Ngày liên tiếp',
     avgQuizScore: 'Điểm TB bài kiểm',
+    // Dashboard cards
+    todaysFocus: 'Tập trung hôm nay',
+    currentStreak: 'Chuỗi ngày',
+    cardsDue: 'Thẻ cần ôn',
+    startFocusSession: 'Bắt đầu tập trung',
+    viewAll: 'Xem tất cả',
+    noTasksToday: 'Không có công việc hôm nay',
+    addTasksToSee: 'Thêm công việc có hạn để xem tại đây',
+    addTask: 'Thêm việc',
+    flashcardReview: 'Ôn tập thẻ nhớ',
+    allCaughtUp: 'Đã hoàn thành!',
+    noFlashcardsDue: 'Không có thẻ cần ôn hôm nay',
+    cardsDueToday: 'thẻ cần ôn hôm nay',
+    startReviewSession: 'Bắt đầu ôn tập',
+    currentCycle: 'Chu kỳ hiện tại',
+    manage: 'Quản lý',
+    progress: 'Tiến độ',
+    tasks: 'việc',
+    noActiveCycle: 'Không có chu kỳ',
+    createCycleDesc: 'Tạo chu kỳ tuần để theo dõi tiến độ',
+    triage: 'Phân loại',
+    inboxZero: 'Hộp thư trống!',
+    quickCapturesHere: 'Ghi chú nhanh sẽ hiển thị tại đây',
+    moreItems: 'mục khác',
+    noSessionsYet: 'Chưa có phiên học',
+    startSessionDesc: 'Bắt đầu phiên tập trung để theo dõi tiến độ',
+    startSession: 'Bắt đầu',
+    thisWeek: 'Tuần này',
+    minutesFocused: 'phút tập trung trong',
+    sessionsText: 'phiên',
+    viewAnalytics: 'Xem thống kê',
+    // Todo widget
+    todoToday: 'Việc hôm nay',
+    noTodosToday: 'Không có việc hôm nay',
+    addFirstTodo: 'Thêm việc đầu tiên để bắt đầu',
+    quickNoteCapture: 'Ghi nhanh',
   },
 
   // Timer
@@ -73,6 +113,11 @@ export const vi: TranslationKeys = {
     focusRating: 'Bạn tập trung như thế nào?',
     skipQuiz: 'Bỏ qua bài kiểm',
     takeQuiz: 'Làm bài kiểm',
+    // Todo linking
+    linkTodo: 'Liên kết việc',
+    selectTodo: 'Chọn việc để tập trung',
+    noTodoLinked: 'Chưa liên kết việc',
+    linkedTo: 'Liên kết với',
   },
 
   // Quiz
@@ -107,6 +152,34 @@ export const vi: TranslationKeys = {
     addFirst: 'Thêm công việc đầu tiên',
   },
 
+  // Todo (Notion-like checklist)
+  todo: {
+    title: 'Việc cần làm',
+    subtitle: 'Danh sách công việc hàng ngày',
+    addPlaceholder: 'Thêm việc mới...',
+    noTodos: 'Chưa có việc',
+    addFirstTodo: 'Thêm việc đầu tiên',
+    addFirstTodoDesc: 'Nhấn Enter để thêm mục mới',
+    all: 'Tất cả',
+    active: 'Đang làm',
+    completed: 'Hoàn thành',
+    clearCompleted: 'Xóa đã hoàn thành',
+    itemsLeft: 'việc còn lại',
+    itemLeft: 'việc còn lại',
+    priority: {
+      low: 'Thấp',
+      medium: 'Trung bình',
+      high: 'Cao',
+      urgent: 'Khẩn cấp',
+    },
+    dueToday: 'Đến hạn hôm nay',
+    overdue: 'Quá hạn',
+    noDueDate: 'Không có hạn',
+    setDueDate: 'Đặt hạn',
+    editTitle: 'Sửa tiêu đề',
+    deleteTodo: 'Xóa việc',
+  },
+
   // Projects
   projects: {
     title: 'Dự án',
@@ -122,6 +195,8 @@ export const vi: TranslationKeys = {
     newNote: 'Ghi chú mới',
     noNotes: 'Chưa có ghi chú',
     startWriting: 'Bắt đầu viết',
+    quickNote: 'Ghi nhanh',
+    quickNotePlaceholder: 'Viết ghi chú nhanh...',
   },
 
   // Flashcards
@@ -194,11 +269,12 @@ export const vi: TranslationKeys = {
     // AI
     aiEnabled: 'AI đã bật',
     aiDisabled: 'AI đã tắt',
-    aiConfigured: 'Đã cấu hình API key Gemini',
-    aiMissing: 'Đặt VITE_GEMINI_API_KEY trong file .env',
+    aiConfigured: 'Tính năng AI khả dụng',
+    aiMissing: 'Cấu hình API key trong biến môi trường',
     aiActive: 'Hoạt động',
     aiInactive: 'Không hoạt động',
     aiDescription: 'Tính năng AI bao gồm tạo bài kiểm, thẻ nhớ và huấn luyện học tập.',
+    aiHelpTooltip: 'Thiết lập Gemini API key trong biến môi trường của repository để bật tính năng AI.',
     getApiKey: 'Lấy API key từ',
     // Data
     dataDescription: 'Xuất dữ liệu để chuyển thiết bị hoặc sao lưu. Tất cả dữ liệu được lưu trữ cục bộ trong trình duyệt.',
@@ -251,7 +327,7 @@ export const vi: TranslationKeys = {
     includeDistractions: 'Bao gồm phân tâm gần đây',
     includeNotes: 'Bao gồm ghi chú đã chọn',
     // States
-    aiUnavailable: 'AI không khả dụng (thiếu env key)',
+    aiUnavailable: 'Tính năng AI không khả dụng',
     offlineMode: 'Chế độ ngoại tuyến',
     noChats: 'Chưa có cuộc trò chuyện',
     startConversation: 'Bắt đầu cuộc trò chuyện đầu tiên',
@@ -312,8 +388,10 @@ export const vi: TranslationKeys = {
     min: 'phút',
     minutes: 'phút',
     hours: 'giờ',
+    days: 'ngày',
     of: 'của',
     and: 'và',
+    review: 'Ôn tập',
   },
 
   // Empty states

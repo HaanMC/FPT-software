@@ -351,7 +351,7 @@ export const vi: TranslationKeys = {
     retry: 'Thử lại',
     errorResponse: 'Đã xảy ra lỗi. Vui lòng thử lại.',
     aiUnreachableToast: 'Không kết nối được AI. Thử lại nhé.',
-    aiUnreachableMessage: 'Mình chưa kết nối được AI lúc này. Bạn thử lại giúp mình nhé.',
+    aiUnreachableMessage: 'Không kết nối được AI. Thử lại nhé.',
   },
 
   // Inbox

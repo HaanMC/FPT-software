@@ -216,9 +216,10 @@ export const ChatPage: React.FC = () => {
       });
       setRetryInfo(null);
     } catch (error) {
+      console.error('[AI] sendChat failed', error);
       const errorMessage = addMessageToConversation(convId, {
         role: 'assistant',
-        content: t.chat.aiUnreachableMessage,
+        content: t.chat.aiUnreachableToast,
       });
       setRetryInfo({
         conversationId: convId,
@@ -275,9 +276,10 @@ export const ChatPage: React.FC = () => {
 
       setRetryInfo(null);
     } catch (error) {
+      console.error('[AI] sendChat failed', error);
       const errorMessage = addMessageToConversation(convId, {
         role: 'assistant',
-        content: t.chat.aiUnreachableMessage,
+        content: t.chat.aiUnreachableToast,
       });
       setRetryInfo({
         conversationId: convId,
@@ -307,9 +309,10 @@ export const ChatPage: React.FC = () => {
       });
       setRetryInfo(null);
     } catch (error) {
+      console.error('[AI] sendChat failed', error);
       const errorMessage = addMessageToConversation(retryInfo.conversationId, {
         role: 'assistant',
-        content: t.chat.aiUnreachableMessage,
+        content: t.chat.aiUnreachableToast,
       });
       setRetryInfo({
         conversationId: retryInfo.conversationId,

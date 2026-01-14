@@ -87,7 +87,8 @@ export const MiniChatDrawer: React.FC = () => {
 
       addMessageToConversation(convId, { role: 'assistant', content: response });
     } catch (error) {
-      addMessageToConversation(convId, { role: 'assistant', content: t.chat.aiUnreachableMessage });
+      console.error('[AI] sendChat failed', error);
+      addMessageToConversation(convId, { role: 'assistant', content: t.chat.aiUnreachableToast });
       showToast(t.chat.aiUnreachableToast, 'error');
     } finally {
       setIsLoading(false);

@@ -11,6 +11,7 @@ import {
   Session,
   Achievement,
   Theme,
+  TodoItem,
 } from '../../types';
 
 const STORAGE_KEY = 'focuslearn_v3';
@@ -84,6 +85,7 @@ function getDefaultState(): AppState {
     cycles: [getCurrentWeekCycle()],
     notes: [],
     inbox: [],
+    todos: [],
     decks: [],
     sessions: [],
     achievements: DEFAULT_ACHIEVEMENTS,
@@ -151,6 +153,9 @@ function migrateFromV2(legacy: LegacyAppData): AppState {
       phaseCount: 1,
       breakPlan: [],
       notes: '',
+      mode: 'timed' as const,
+      plannedDurationSeconds: h.durationSeconds,
+      focusRating: null,
     }));
 
   // Migrate decks with project associations
@@ -190,7 +195,7 @@ function migrateFromV2(legacy: LegacyAppData): AppState {
   };
 }
 
-// Migrate from v3 to v4 (add conversations, userName, language)
+// Migrate from v3 to v4 (add conversations, userName, language, todos)
 function migrateFromV3(oldState: any): AppState {
   const defaultState = getDefaultState();
   return {
@@ -203,6 +208,7 @@ function migrateFromV3(oldState: any): AppState {
     },
     conversations: oldState.conversations || [],
     activeConversationId: oldState.activeConversationId || null,
+    todos: oldState.todos || [],
     // Migrate existing sessions to include new fields
     sessions: (oldState.sessions || []).map((s: any) => ({
       ...s,

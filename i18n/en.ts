@@ -13,6 +13,7 @@ export const en = {
   nav: {
     dashboard: 'Dashboard',
     inbox: 'Inbox',
+    todo: 'Todo',
     tasks: 'Tasks',
     projects: 'Projects',
     notes: 'Notes',
@@ -30,6 +31,9 @@ export const en = {
     title: 'Dashboard',
     subtitle: 'Your study overview',
     greeting: 'Welcome back',
+    greetingMorning: 'Good morning',
+    greetingAfternoon: 'Good afternoon',
+    greetingEvening: 'Good evening',
     todaysTasks: "Today's Tasks",
     recentSessions: 'Recent Sessions',
     quickStats: 'Quick Stats',
@@ -37,6 +41,42 @@ export const en = {
     tasksCompleted: 'Tasks Completed',
     streakDays: 'Day Streak',
     avgQuizScore: 'Avg Quiz Score',
+    // Dashboard cards
+    todaysFocus: "Today's Focus",
+    currentStreak: 'Current Streak',
+    cardsDue: 'Cards Due',
+    startFocusSession: 'Start Focus Session',
+    viewAll: 'View All',
+    noTasksToday: 'No tasks for today',
+    addTasksToSee: 'Add tasks with due dates to see them here',
+    addTask: 'Add Task',
+    flashcardReview: 'Flashcard Review',
+    allCaughtUp: 'All caught up!',
+    noFlashcardsDue: 'No flashcards due for review today',
+    cardsDueToday: 'cards due today',
+    startReviewSession: 'Start Review Session',
+    currentCycle: 'Current Cycle',
+    manage: 'Manage',
+    progress: 'Progress',
+    tasks: 'tasks',
+    noActiveCycle: 'No active cycle',
+    createCycleDesc: 'Create a weekly cycle to track your sprint',
+    triage: 'Triage',
+    inboxZero: 'Inbox zero!',
+    quickCapturesHere: 'Quick captures will appear here',
+    moreItems: 'more items',
+    noSessionsYet: 'No sessions yet',
+    startSessionDesc: 'Start a focus session to begin tracking your progress',
+    startSession: 'Start Session',
+    thisWeek: 'This Week',
+    minutesFocused: 'minutes focused across',
+    sessionsText: 'sessions',
+    viewAnalytics: 'View Analytics',
+    // Todo widget
+    todoToday: 'Todo Today',
+    noTodosToday: 'No todos for today',
+    addFirstTodo: 'Add your first todo to get started',
+    quickNoteCapture: 'Quick Note',
   },
 
   // Timer
@@ -71,6 +111,11 @@ export const en = {
     focusRating: 'How focused were you?',
     skipQuiz: 'Skip Quiz',
     takeQuiz: 'Take Quiz',
+    // Todo linking
+    linkTodo: 'Link Todo',
+    selectTodo: 'Select a todo to focus on',
+    noTodoLinked: 'No todo linked',
+    linkedTo: 'Linked to',
   },
 
   // Quiz
@@ -105,6 +150,34 @@ export const en = {
     addFirst: 'Add your first task',
   },
 
+  // Todo (Notion-like checklist)
+  todo: {
+    title: 'Todo',
+    subtitle: 'Your daily checklist',
+    addPlaceholder: 'Add a new todo...',
+    noTodos: 'No todos yet',
+    addFirstTodo: 'Add your first todo',
+    addFirstTodoDesc: 'Press Enter to add a new item',
+    all: 'All',
+    active: 'Active',
+    completed: 'Completed',
+    clearCompleted: 'Clear Completed',
+    itemsLeft: 'items left',
+    itemLeft: 'item left',
+    priority: {
+      low: 'Low',
+      medium: 'Medium',
+      high: 'High',
+      urgent: 'Urgent',
+    },
+    dueToday: 'Due today',
+    overdue: 'Overdue',
+    noDueDate: 'No due date',
+    setDueDate: 'Set due date',
+    editTitle: 'Edit title',
+    deleteTodo: 'Delete todo',
+  },
+
   // Projects
   projects: {
     title: 'Projects',
@@ -120,6 +193,8 @@ export const en = {
     newNote: 'New Note',
     noNotes: 'No notes yet',
     startWriting: 'Start writing',
+    quickNote: 'Quick Note',
+    quickNotePlaceholder: 'Write a quick note...',
   },
 
   // Flashcards
@@ -192,11 +267,12 @@ export const en = {
     // AI
     aiEnabled: 'AI Enabled',
     aiDisabled: 'AI Disabled',
-    aiConfigured: 'Gemini API key configured',
-    aiMissing: 'Set VITE_GEMINI_API_KEY in your .env file',
+    aiConfigured: 'AI features are available',
+    aiMissing: 'Configure API key in repository environment',
     aiActive: 'Active',
     aiInactive: 'Inactive',
     aiDescription: 'AI features include quiz generation, flashcard creation, and study coaching.',
+    aiHelpTooltip: 'Set up the Gemini API key in your repository environment variables to enable AI features.',
     getApiKey: 'Get your API key from',
     // Data
     dataDescription: 'Export your progress to transfer devices or keep a backup. All data is stored locally in your browser.',
@@ -249,7 +325,7 @@ export const en = {
     includeDistractions: 'Include Recent Distractions',
     includeNotes: 'Include Selected Notes',
     // States
-    aiUnavailable: 'AI unavailable (missing env key)',
+    aiUnavailable: 'AI features unavailable',
     offlineMode: 'Offline Mode',
     noChats: 'No conversations yet',
     startConversation: 'Start your first conversation',
@@ -310,8 +386,10 @@ export const en = {
     min: 'min',
     minutes: 'minutes',
     hours: 'hours',
+    days: 'days',
     of: 'of',
     and: 'and',
+    review: 'Review',
   },
 
   // Empty states
@@ -330,4 +408,9 @@ export const en = {
   },
 } as const;
 
-export type TranslationKeys = typeof en;
+// Deep type that converts literal strings to just string
+type DeepString<T> = {
+  [K in keyof T]: T[K] extends string ? string : DeepString<T[K]>;
+};
+
+export type TranslationKeys = DeepString<typeof en>;

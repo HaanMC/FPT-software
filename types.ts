@@ -67,6 +67,23 @@ export interface InboxItem {
 }
 
 // ============================================
+// Todo Types (Notion-like checklist)
+// ============================================
+
+export type TodoPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface TodoItem {
+  id: string;
+  title: string;
+  done: boolean;
+  createdAt: string;
+  updatedAt: string;
+  dueDate: string | null;
+  subjectId: string | null;
+  priority: TodoPriority;
+}
+
+// ============================================
 // Flashcard Types (SM-2 Algorithm)
 // ============================================
 
@@ -238,6 +255,7 @@ export interface AppState {
   cycles: Cycle[];
   notes: Note[];
   inbox: InboxItem[];
+  todos: TodoItem[];
 
   // Flashcards
   decks: FlashcardDeck[];

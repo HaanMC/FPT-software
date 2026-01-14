@@ -8,7 +8,7 @@ import { useGlobal } from '../context/GlobalContext';
 import { useT } from '../i18n';
 import {
   LayoutDashboard,
-  Inbox,
+  ListTodo,
   CheckSquare,
   FolderKanban,
   FileText,
@@ -70,7 +70,7 @@ export const Sidebar: React.FC = () => {
   const collapsed = state.settings.sidebarCollapsed;
 
   // Calculate badges
-  const inboxCount = state.inbox.length;
+  const activeTodos = state.todos.filter((todo) => !todo.done).length;
   const todayTasks = state.tasks.filter(
     (task) => task.status !== 'done' && task.dueDate === new Date().toISOString().split('T')[0]
   ).length;
@@ -128,7 +128,8 @@ export const Sidebar: React.FC = () => {
       <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
         {/* Main */}
         <NavItem to="/dashboard" icon={<LayoutDashboard size={18} />} label={t.nav.dashboard} collapsed={collapsed} />
-        <NavItem to="/inbox" icon={<Inbox size={18} />} label={t.nav.inbox} badge={inboxCount} collapsed={collapsed} />
+        <NavItem to="/todo" icon={<ListTodo size={18} />} label={t.nav.todo} badge={activeTodos} collapsed={collapsed} />
+        <NavItem to="/notes" icon={<FileText size={18} />} label={t.nav.notes} collapsed={collapsed} />
 
         {/* Divider */}
         {!collapsed && (
@@ -140,7 +141,6 @@ export const Sidebar: React.FC = () => {
         {/* Work */}
         <NavItem to="/tasks" icon={<CheckSquare size={18} />} label={t.nav.tasks} badge={todayTasks} collapsed={collapsed} />
         <NavItem to="/projects" icon={<FolderKanban size={18} />} label={t.nav.projects} collapsed={collapsed} />
-        <NavItem to="/notes" icon={<FileText size={18} />} label={t.nav.notes} collapsed={collapsed} />
         <NavItem to="/flashcards" icon={<GraduationCap size={18} />} label={t.nav.flashcards} badge={dueCards} collapsed={collapsed} />
 
         {/* Divider */}

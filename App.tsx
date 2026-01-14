@@ -4,7 +4,7 @@
  *
  * Features:
  * - Dashboard with stats and quick access
- * - Inbox for quick capture
+ * - Todo list (Notion-style checklist)
  * - Tasks with status/priority management
  * - Projects (subjects) and weekly cycles
  * - Notes with markdown and [[backlinks]]
@@ -22,7 +22,7 @@ import AppShell from './components/AppShell';
 
 // Pages
 import DashboardPage from './pages/DashboardPage';
-import InboxPage from './pages/InboxPage';
+import TodoPage from './pages/TodoPage';
 import TasksPage from './pages/TasksPage';
 import ProjectsPage from './pages/ProjectsPage';
 import NotesPage from './pages/NotesPage';
@@ -45,7 +45,7 @@ const App: React.FC = () => {
             <Route index element={<DashboardPage />} />
 
             {/* Core features */}
-            <Route path="inbox" element={<InboxPage />} />
+            <Route path="todo" element={<TodoPage />} />
             <Route path="tasks" element={<TasksPage />} />
             <Route path="projects" element={<ProjectsPage />} />
             <Route path="notes" element={<NotesPage />} />
@@ -68,6 +68,7 @@ const App: React.FC = () => {
             {/* Legacy redirects */}
             <Route path="shop" element={<Navigate to="/" replace />} />
             <Route path="coach" element={<Navigate to="/chat" replace />} />
+            <Route path="inbox" element={<Navigate to="/todo" replace />} />
           </Route>
 
           {/* Catch all - redirect to dashboard */}

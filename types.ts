@@ -210,9 +210,14 @@ export interface ChatMessage {
 export interface Conversation {
   id: string;
   title: string;
-  messages: ChatMessage[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ChatStore {
+  conversations: Conversation[];
+  messagesByConvId: Record<string, ChatMessage[]>;
+  activeConversationId: string | null;
 }
 
 export interface ChatContextOptions {
@@ -267,8 +272,7 @@ export interface AppState {
   achievements: Achievement[];
 
   // AI Chat
-  conversations: Conversation[];
-  activeConversationId: string | null;
+  chat: ChatStore;
 
   // UI State (persisted)
   lastActiveRoute: string;

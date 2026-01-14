@@ -23,7 +23,7 @@ import {
   TodoItem,
   TodoPriority,
 } from '../types';
-import { LanguageContext } from '../i18n';
+import { LanguageContext, getTranslation } from '../i18n';
 import { loadState, saveState, generateId } from '../lib/storage/store';
 
 // Toast types
@@ -97,6 +97,7 @@ interface GlobalContextType {
   setActiveConversation: (id: string | null) => void;
   addMessageToConversation: (conversationId: string, message: Omit<ChatMessage, 'id' | 'createdAt'>) => ChatMessage;
   getActiveConversation: () => Conversation | null;
+  getConversationMessages: (conversationId: string | null) => ChatMessage[];
 
   // Favorites
   toggleFavorite: (path: string) => void;
@@ -573,40 +574,61 @@ export const GlobalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // ============================================
   const addConversation = useCallback((title?: string): Conversation => {
     const now = new Date().toISOString();
+    const conversationTitle = title || getTranslation(state.settings.language, 'chat.newChat');
     const conversation: Conversation = {
       id: generateId('conv'),
-      title: title || 'New Chat',
-      messages: [],
+      title: conversationTitle,
       createdAt: now,
       updatedAt: now,
     };
     setState((prev) => ({
       ...prev,
-      conversations: [conversation, ...prev.conversations],
-      activeConversationId: conversation.id,
+      chat: {
+        ...prev.chat,
+        conversations: [conversation, ...prev.chat.conversations],
+        messagesByConvId: {
+          ...prev.chat.messagesByConvId,
+          [conversation.id]: [],
+        },
+        activeConversationId: conversation.id,
+      },
     }));
     return conversation;
-  }, []);
+  }, [state.settings.language]);
 
   const updateConversation = useCallback((id: string, updates: Partial<Conversation>) => {
     setState((prev) => ({
       ...prev,
-      conversations: prev.conversations.map((c) =>
-        c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c
-      ),
+      chat: {
+        ...prev.chat,
+        conversations: prev.chat.conversations.map((c) =>
+          c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c
+        ),
+      },
     }));
   }, []);
 
   const deleteConversation = useCallback((id: string) => {
     setState((prev) => ({
       ...prev,
-      conversations: prev.conversations.filter((c) => c.id !== id),
-      activeConversationId: prev.activeConversationId === id ? null : prev.activeConversationId,
+      chat: {
+        ...prev.chat,
+        conversations: prev.chat.conversations.filter((c) => c.id !== id),
+        messagesByConvId: Object.fromEntries(
+          Object.entries(prev.chat.messagesByConvId).filter(([convId]) => convId !== id)
+        ),
+        activeConversationId: prev.chat.activeConversationId === id
+          ? prev.chat.conversations.find((c) => c.id !== id)?.id || null
+          : prev.chat.activeConversationId,
+      },
     }));
   }, []);
 
   const setActiveConversation = useCallback((id: string | null) => {
-    setState((prev) => ({ ...prev, activeConversationId: id }));
+    setState((prev) => ({
+      ...prev,
+      chat: { ...prev.chat, activeConversationId: id },
+    }));
   }, []);
 
   const addMessageToConversation = useCallback(
@@ -618,11 +640,18 @@ export const GlobalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       };
       setState((prev) => ({
         ...prev,
-        conversations: prev.conversations.map((c) =>
-          c.id === conversationId
-            ? { ...c, messages: [...c.messages, message], updatedAt: new Date().toISOString() }
-            : c
-        ),
+        chat: {
+          ...prev.chat,
+          conversations: prev.chat.conversations.map((c) =>
+            c.id === conversationId
+              ? { ...c, updatedAt: new Date().toISOString() }
+              : c
+          ),
+          messagesByConvId: {
+            ...prev.chat.messagesByConvId,
+            [conversationId]: [...(prev.chat.messagesByConvId[conversationId] || []), message],
+          },
+        },
       }));
       return message;
     },
@@ -630,8 +659,16 @@ export const GlobalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   );
 
   const getActiveConversation = useCallback((): Conversation | null => {
-    return state.conversations.find((c) => c.id === state.activeConversationId) || null;
-  }, [state.conversations, state.activeConversationId]);
+    return state.chat.conversations.find((c) => c.id === state.chat.activeConversationId) || null;
+  }, [state.chat.conversations, state.chat.activeConversationId]);
+
+  const getConversationMessages = useCallback(
+    (conversationId: string | null): ChatMessage[] => {
+      if (!conversationId) return [];
+      return state.chat.messagesByConvId[conversationId] || [];
+    },
+    [state.chat.messagesByConvId]
+  );
 
   // ============================================
   // Favorites Operations
@@ -708,6 +745,7 @@ export const GlobalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setActiveConversation,
     addMessageToConversation,
     getActiveConversation,
+    getConversationMessages,
     toggleFavorite,
     isFavorite,
     toasts,

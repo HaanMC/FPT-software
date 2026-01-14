@@ -33,7 +33,7 @@ const Layout: React.FC = () => {
       <nav className="fixed md:relative bottom-0 w-full md:w-20 bg-white border-t md:border-t-0 md:border-r border-gray-200 flex md:flex-col justify-around md:justify-start md:pt-8 md:space-y-6 z-50 order-2 md:order-1 h-16 md:h-full shrink-0">
         <NavLink to="/" className={navItemClass}><Timer size={24} /><span className="text-[10px] md:hidden">Focus</span></NavLink>
         <NavLink to="/flashcards" className={navItemClass}><BookOpen size={24} /><span className="text-[10px] md:hidden">Cards</span></NavLink>
-        <NavLink to="/coach" className={navItemClass}><MessageSquare size={24} /><span className="text-[10px] md:hidden">Coach</span></NavLink>
+        <NavLink to="/chat" className={navItemClass}><MessageSquare size={24} /><span className="text-[10px] md:hidden">Chat</span></NavLink>
         <NavLink to="/shop" className={navItemClass}><ShoppingBag size={24} /><span className="text-[10px] md:hidden">Shop</span></NavLink>
         <NavLink to="/analytics" className={navItemClass}><BarChart2 size={24} /><span className="text-[10px] md:hidden">Stats</span></NavLink>
         <NavLink to="/settings" className={navItemClass}><Settings size={24} /><span className="text-[10px] md:hidden">Settings</span></NavLink>

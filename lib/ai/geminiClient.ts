@@ -1,13 +1,14 @@
 /**
  * Gemini AI Client for FocusLearn
  * Handles AI features with graceful degradation when API key is missing
- *
- * Uses Vite environment variables: import.meta.env.VITE_GEMINI_API_KEY
+ * Uses Gemini REST API via fetch.
  */
 
-import { GoogleGenAI, Type } from '@google/genai';
 import { QuizData, QuizQuestion } from '../../types';
 import { FALLBACK_QUIZZES, FALLBACK_FLASHCARDS } from '../../constants';
+
+const DEFAULT_MODEL = 'gemini-2.5-flash';
+const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 // Toast callback for showing messages
 let toastCallback: ((message: string, type: 'info' | 'error' | 'success') => void) | null = null;
@@ -28,17 +29,18 @@ function showToast(message: string, type: 'info' | 'error' | 'success' = 'info')
  * Get Gemini API key from environment variables
  * Detects build tool (Vite/CRA/Next) and uses appropriate env access
  */
-export function getGeminiKeyFromEnv(): string | null {
-  // Vite: import.meta.env.VITE_*
+export function getApiKey(): string | null {
   if (typeof import.meta !== 'undefined' && import.meta.env) {
-    const key = import.meta.env.VITE_GEMINI_API_KEY;
-    if (key) return key;
+    return import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || null;
   }
 
-  // Fallback to process.env (injected by vite.config.ts)
   if (typeof process !== 'undefined' && process.env) {
-    const key = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-    if (key) return key;
+    return (
+      process.env.REACT_APP_GEMINI_API_KEY ||
+      process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
+      process.env.GEMINI_API_KEY ||
+      null
+    );
   }
 
   return null;
@@ -48,51 +50,101 @@ export function getGeminiKeyFromEnv(): string | null {
  * Check if AI features are enabled
  */
 export function isAiEnabled(): boolean {
-  const key = getGeminiKeyFromEnv();
+  const key = getApiKey();
   return !!key && key.length > 0;
 }
 
-/**
- * Get AI client instance (or null if not available)
- */
-function getAiClient(): GoogleGenAI | null {
-  const apiKey = getGeminiKeyFromEnv();
+type GeminiMessage = {
+  role: 'user' | 'model';
+  parts: { text: string }[];
+};
+
+interface GeminiRequestOptions {
+  model?: string;
+  contents: GeminiMessage[];
+  systemPrompt?: string;
+  generationConfig?: {
+    temperature?: number;
+    maxOutputTokens?: number;
+  };
+}
+
+async function requestGemini({ model = DEFAULT_MODEL, contents, systemPrompt, generationConfig }: GeminiRequestOptions) {
+  const apiKey = getApiKey();
   if (!apiKey) {
+    throw new Error('Missing Gemini API key');
+  }
+
+  const body = {
+    contents,
+    systemInstruction: systemPrompt ? { parts: [{ text: systemPrompt }] } : undefined,
+    generationConfig: generationConfig || {
+      temperature: 0.6,
+      maxOutputTokens: 800,
+    },
+  };
+
+  const response = await fetch(`${GEMINI_BASE_URL}/${model}:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini request failed: ${response.status} ${errorText}`);
+  }
+
+  return response.json();
+}
+
+function extractGeminiText(data: any): string {
+  const parts = data?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) return '';
+  return parts.map((part: any) => part?.text || '').join('').trim();
+}
+
+function extractJson<T>(text: string): T | null {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) return null;
+  try {
+    return JSON.parse(text.slice(start, end + 1)) as T;
+  } catch (error) {
     return null;
   }
-  return new GoogleGenAI({ apiKey });
+}
+
+function buildSystemPrompt(language: 'en' | 'vi' = 'en', context?: string): string {
+  const langText = language === 'vi' ? 'Vietnamese' : 'English';
+  return `You are FocusLearn, a study assistant. Respond in ${langText}. Be concise and practical.
+When asked to explain, use simple examples. When asked for a plan, give time-boxed steps.
+If the request is ambiguous, ask 1–2 clarifying questions.
+Avoid medical or therapy advice. If asked, gently redirect to professional help.
+${context ? `\nStudy context:\n${context}` : ''}`.trim();
 }
 
 /**
  * Generic JSON fetcher with error handling and retry
  */
-async function callGeminiJson<T>(
-  prompt: string,
-  schema: any,
-  fallback: T,
-  retries: number = 1
-): Promise<T> {
-  const ai = getAiClient();
-  if (!ai) {
+async function callGeminiJson<T>(prompt: string, fallback: T, retries: number = 1): Promise<T> {
+  if (!isAiEnabled()) {
     return fallback;
   }
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: schema,
-        },
+      const data = await requestGemini({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.4, maxOutputTokens: 800 },
       });
-
-      const text = response.text;
+      const text = extractGeminiText(data);
       if (!text) throw new Error('Empty AI response');
-
-      const parsed = JSON.parse(text) as T;
-      return parsed;
+      const parsed = extractJson<T>(text);
+      if (parsed) return parsed;
+      throw new Error('Failed to parse JSON');
     } catch (e) {
       console.warn(`AI generation attempt ${attempt + 1} failed:`, e);
       if (attempt === retries) {
@@ -103,37 +155,6 @@ async function callGeminiJson<T>(
 
   return fallback;
 }
-
-// Quiz schema for structured output
-const QUIZ_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    title: { type: Type.STRING },
-    questions: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          q: { type: Type.STRING },
-          choices: {
-            type: Type.OBJECT,
-            properties: {
-              A: { type: Type.STRING },
-              B: { type: Type.STRING },
-              C: { type: Type.STRING },
-              D: { type: Type.STRING },
-            },
-            required: ['A', 'B', 'C', 'D'],
-          },
-          answer: { type: Type.STRING, enum: ['A', 'B', 'C', 'D'] },
-          explanation: { type: Type.STRING },
-        },
-        required: ['q', 'choices', 'answer', 'explanation'],
-      },
-    },
-  },
-  required: ['title', 'questions'],
-};
 
 /**
  * Select random questions from fallback bank
@@ -156,18 +177,14 @@ export async function generateQuiz(
     questions: selectRandomQuestions(fallbackQuiz.questions, 10),
   };
 
-  if (!isAiEnabled()) {
-    return fallbackData;
-  }
-
   const prompt = `Generate a 10-question multiple-choice quiz about "${subject}".
 Difficulty: ${difficulty}.
 Each question must have exactly 4 choices (A, B, C, D) with only one correct answer.
 Make questions educational and appropriate for students.
 Ensure questions are accurate and have clear, unambiguous correct answers.
-Return ONLY valid JSON matching the schema provided.`;
+Return ONLY valid JSON with the shape: { title: string, questions: [{ q, choices: {A,B,C,D}, answer, explanation }] }.`;
 
-  return callGeminiJson<QuizData>(prompt, QUIZ_SCHEMA, fallbackData);
+  return callGeminiJson<QuizData>(prompt, fallbackData);
 }
 
 /**
@@ -183,19 +200,15 @@ export async function generateRetryQuiz(
     questions: selectRandomQuestions(fallbackQuiz.questions, 5),
   };
 
-  if (!isAiEnabled()) {
-    return fallbackData;
-  }
-
   const topics = incorrectQuestions.map((q) => q.q).join('; ');
   const prompt = `Generate a 5-question multiple-choice quiz about "${subject}".
 The student struggled with these topics: ${topics}
 Create 5 NEW questions (different from the originals) testing similar concepts.
 Difficulty: easy.
 Each question must have exactly 4 choices (A, B, C, D) with only one correct answer.
-Return ONLY valid JSON matching the schema provided.`;
+Return ONLY valid JSON with the shape: { title: string, questions: [{ q, choices: {A,B,C,D}, answer, explanation }] }.`;
 
-  return callGeminiJson<QuizData>(prompt, QUIZ_SCHEMA, fallbackData);
+  return callGeminiJson<QuizData>(prompt, fallbackData);
 }
 
 /**
@@ -206,26 +219,6 @@ export async function generateFlashcards(
   topic: string,
   count: number
 ): Promise<{ deckTitle: string; cards: any[] }> {
-  const schema = {
-    type: Type.OBJECT,
-    properties: {
-      deckTitle: { type: Type.STRING },
-      cards: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            front: { type: Type.STRING },
-            back: { type: Type.STRING },
-            example: { type: Type.STRING },
-          },
-          required: ['front', 'back'],
-        },
-      },
-    },
-    required: ['deckTitle', 'cards'],
-  };
-
   const fallback = { deckTitle: `${subject} (Offline)`, cards: FALLBACK_FLASHCARDS };
 
   if (!isAiEnabled()) {
@@ -234,9 +227,10 @@ export async function generateFlashcards(
   }
 
   const prompt = `Create ${count} flashcards for Subject: "${subject}", Topic: "${topic}".
+Return ONLY valid JSON with the shape: { deckTitle: string, cards: [{ front, back, example? }] }.
 Front should be a term or question, Back should be the definition or answer.`;
 
-  return callGeminiJson(prompt, schema, fallback);
+  return callGeminiJson(prompt, fallback);
 }
 
 /**
@@ -247,12 +241,6 @@ export async function generateCoachTips(
   distractions: string[],
   score: number
 ): Promise<{ tips: string[] }> {
-  const schema = {
-    type: Type.OBJECT,
-    properties: { tips: { type: Type.ARRAY, items: { type: Type.STRING } } },
-    required: ['tips'],
-  };
-
   const fallback = {
     tips: [
       'Focus on one concept at a time.',
@@ -267,9 +255,9 @@ export async function generateCoachTips(
 
   const prompt = `Student studied ${subject}. Quiz score: ${score}%.
 Distractions reported: ${distractions.join(', ') || 'None'}.
-Give 3 short, actionable study tips.`;
+Return ONLY valid JSON with the shape: { tips: string[] }. Provide 3 short, actionable study tips.`;
 
-  return callGeminiJson(prompt, schema, fallback);
+  return callGeminiJson(prompt, fallback);
 }
 
 /**
@@ -290,64 +278,25 @@ export async function sendChatMessage(
     context?: string;
   } = {}
 ): Promise<string> {
-  if (!isAiEnabled()) {
-    return options.language === 'vi'
-      ? "AI hiện không khả dụng. Vui lòng thêm API key Gemini vào biến môi trường."
-      : "AI is currently unavailable. Please add your Gemini API key to environment variables.";
-  }
+  const systemPrompt = buildSystemPrompt(options.language || 'en', options.context);
 
-  const ai = getAiClient();
-  if (!ai) {
-    return options.language === 'vi'
-      ? "AI hiện không khả dụng."
-      : "AI is currently unavailable.";
-  }
+  const conversationParts: GeminiMessage[] = messages.map((msg) => ({
+    role: msg.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: msg.content }],
+  }));
 
-  const languageInstruction = options.language === 'vi'
-    ? 'Respond in Vietnamese. '
-    : 'Respond in English. ';
-
-  const systemPrompt = `You are a helpful, focused study coach for students using FocusLearn.
-${languageInstruction}
-Your role:
-- Help students understand concepts, create study plans, and stay motivated
-- Provide structured, practical answers
-- Ask clarifying questions if the request is ambiguous
-- Keep responses concise but thorough
-
-Rules:
-- Do NOT provide medical, therapy, or mental health advice - suggest professional help instead
-- Do NOT collect personal data beyond what's needed for study context
-- Stay focused on academic and learning topics
-- Be encouraging but honest
-
-${options.context ? `Student context:\n${options.context}\n` : ''}`;
-
-  // Build conversation for Gemini
-  const conversationParts = messages.map(msg => {
-    if (msg.role === 'user') {
-      return { role: 'user', parts: [{ text: msg.content }] };
-    } else {
-      return { role: 'model', parts: [{ text: msg.content }] };
-    }
+  const data = await requestGemini({
+    contents: conversationParts,
+    systemPrompt,
+    generationConfig: { temperature: 0.6, maxOutputTokens: 800 },
   });
 
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: [
-        { role: 'user', parts: [{ text: systemPrompt }] },
-        { role: 'model', parts: [{ text: 'I understand. I am ready to help as a study coach.' }] },
-        ...conversationParts,
-      ],
-    });
-    return response.text || (options.language === 'vi' ? "Tôi không thể trả lời." : "I couldn't generate a response.");
-  } catch (e) {
-    console.error('Chat error:', e);
-    return options.language === 'vi'
-      ? "Xin lỗi, tôi đang gặp sự cố kết nối."
-      : "Sorry, I'm having trouble connecting right now.";
+  const text = extractGeminiText(data);
+  if (!text) {
+    return options.language === 'vi' ? 'Tôi không thể tạo phản hồi ngay bây giờ.' : "I couldn't generate a response right now.";
   }
+
+  return text;
 }
 
 /**
@@ -365,12 +314,6 @@ export async function generateStudySuggestions(
   recentWrongAnswers: string[],
   topDistractions: string[]
 ): Promise<{ suggestions: string[] }> {
-  const schema = {
-    type: Type.OBJECT,
-    properties: { suggestions: { type: Type.ARRAY, items: { type: Type.STRING } } },
-    required: ['suggestions'],
-  };
-
   const fallback = {
     suggestions: [
       'Start with your most challenging subject while your energy is high.',
@@ -387,7 +330,7 @@ export async function generateStudySuggestions(
 Tasks pending today: ${todayTasks}
 Recent topics struggled with: ${recentWrongAnswers.slice(0, 3).join(', ') || 'None'}
 Common distractions: ${topDistractions.join(', ') || 'None'}
-Keep each suggestion under 20 words.`;
+Return ONLY valid JSON with the shape: { suggestions: string[] }. Keep each suggestion under 20 words.`;
 
-  return callGeminiJson(prompt, schema, fallback);
+  return callGeminiJson(prompt, fallback);
 }

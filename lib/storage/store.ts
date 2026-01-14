@@ -13,10 +13,11 @@ import {
   Theme,
   TodoItem,
 } from '../../types';
+import { getTranslation } from '../../i18n';
 
 const STORAGE_KEY = 'focuslearn_v3';
 const LEGACY_KEY = 'focusLearnPlus_v2';
-const CURRENT_SCHEMA_VERSION = 4;
+const CURRENT_SCHEMA_VERSION = 5;
 
 // Default projects (subjects)
 const DEFAULT_PROJECTS: Project[] = [
@@ -89,8 +90,11 @@ function getDefaultState(): AppState {
     decks: [],
     sessions: [],
     achievements: DEFAULT_ACHIEVEMENTS,
-    conversations: [],
-    activeConversationId: null,
+    chat: {
+      conversations: [],
+      messagesByConvId: {},
+      activeConversationId: null,
+    },
     lastActiveRoute: '/dashboard',
     favorites: ['/dashboard', '/timer', '/tasks'],
   };
@@ -197,7 +201,11 @@ function migrateFromV2(legacy: LegacyAppData): AppState {
 
 // Migrate from v3 to v4 (add conversations, userName, language, todos)
 function migrateFromV3(oldState: any): AppState {
-  const defaultState = getDefaultState();
+  const conversations = oldState.conversations || [];
+  const messagesByConvId = conversations.reduce((acc: Record<string, any[]>, conv: any) => {
+    acc[conv.id] = conv.messages || [];
+    return acc;
+  }, {});
   return {
     ...oldState,
     schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -206,8 +214,11 @@ function migrateFromV3(oldState: any): AppState {
       userName: oldState.settings?.userName || '',
       language: oldState.settings?.language || 'en',
     },
-    conversations: oldState.conversations || [],
-    activeConversationId: oldState.activeConversationId || null,
+    chat: {
+      conversations: conversations.map(({ messages, ...rest }: any) => rest),
+      messagesByConvId,
+      activeConversationId: oldState.activeConversationId || null,
+    },
     todos: oldState.todos || [],
     // Migrate existing sessions to include new fields
     sessions: (oldState.sessions || []).map((s: any) => ({
@@ -216,6 +227,80 @@ function migrateFromV3(oldState: any): AppState {
       plannedDurationSeconds: s.plannedDurationSeconds ?? s.durationSeconds,
       focusRating: s.focusRating ?? null,
     })),
+  };
+}
+
+// Migrate from v4 to v5 (chat store schema)
+function migrateFromV4(oldState: any): AppState {
+  const defaultState = getDefaultState();
+  const conversations = oldState.conversations || oldState.chat?.conversations || [];
+  const extractedMessages = conversations.reduce((acc: Record<string, any[]>, conv: any) => {
+    if (conv.messages) {
+      acc[conv.id] = conv.messages;
+    }
+    return acc;
+  }, {});
+  const messagesByConvId = {
+    ...extractedMessages,
+    ...(oldState.messagesByConvId || oldState.chat?.messagesByConvId || {}),
+  };
+  const activeConversationId = oldState.activeConversationId || oldState.chat?.activeConversationId || null;
+  return {
+    ...defaultState,
+    ...oldState,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    chat: {
+      conversations: conversations.map(({ messages, ...rest }: any) => rest),
+      messagesByConvId,
+      activeConversationId,
+    },
+  };
+}
+
+function normalizeChatState(state: AppState): AppState {
+  const now = new Date().toISOString();
+  const defaultTitle = getTranslation(state.settings?.language || 'en', 'chat.newChat');
+  const chat = (state as any).chat || {
+    conversations: (state as any).conversations || [],
+    messagesByConvId: (state as any).messagesByConvId || {},
+    activeConversationId: (state as any).activeConversationId || null,
+  };
+  const messagesByConvId: Record<string, any[]> = { ...chat.messagesByConvId };
+  const conversations = (chat.conversations || []).map((conv: any) => {
+    if (conv.messages) {
+      messagesByConvId[conv.id] = conv.messages;
+    }
+    if (!messagesByConvId[conv.id]) {
+      messagesByConvId[conv.id] = [];
+    }
+    return {
+      id: conv.id,
+      title: conv.title || defaultTitle,
+      createdAt: conv.createdAt || now,
+      updatedAt: conv.updatedAt || now,
+    };
+  });
+
+  if (conversations.length === 0) {
+    const firstConversation = {
+      id: generateId('conv'),
+      title: defaultTitle,
+      createdAt: now,
+      updatedAt: now,
+    };
+    conversations.push(firstConversation);
+    messagesByConvId[firstConversation.id] = [];
+  }
+
+  const activeConversationId = chat.activeConversationId || conversations[0].id;
+
+  return {
+    ...state,
+    chat: {
+      conversations,
+      messagesByConvId,
+      activeConversationId,
+    },
   };
 }
 
@@ -228,14 +313,20 @@ export function loadState(): AppState {
       const parsed = JSON.parse(storedData);
       // Ensure we have current schema version
       if (parsed.schemaVersion === CURRENT_SCHEMA_VERSION) {
-        return parsed as AppState;
+        return normalizeChatState(parsed as AppState);
       }
       // Migrate from v3 to v4
       if (parsed.schemaVersion === 3) {
         console.log('Migrating from v3 schema...');
         const migrated = migrateFromV3(parsed);
         saveState(migrated);
-        return migrated;
+        return normalizeChatState(migrated);
+      }
+      if (parsed.schemaVersion === 4) {
+        console.log('Migrating from v4 schema...');
+        const migrated = migrateFromV4(parsed);
+        saveState(migrated);
+        return normalizeChatState(migrated);
       }
     }
 
@@ -247,14 +338,14 @@ export function loadState(): AppState {
       const migrated = migrateFromV2(parsed);
       // Save migrated data
       saveState(migrated);
-      return migrated;
+      return normalizeChatState(migrated);
     }
 
     // No existing data, return defaults
-    return getDefaultState();
+    return normalizeChatState(getDefaultState());
   } catch (e) {
     console.error('Failed to load state:', e);
-    return getDefaultState();
+    return normalizeChatState(getDefaultState());
   }
 }
 

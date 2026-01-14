@@ -7,6 +7,8 @@
 import { QuizData, QuizQuestion } from '../../types';
 import { FALLBACK_QUIZZES, FALLBACK_FLASHCARDS } from '../../constants';
 
+export const HARDCODED_GEMINI_API_KEY = 'PASTE_YOUR_KEY_HERE';
+
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -29,34 +31,43 @@ function showToast(message: string, type: 'info' | 'error' | 'success' = 'info')
  * Get Gemini API key from environment variables
  * Detects build tool (Vite/CRA/Next) and uses appropriate env access
  */
-export function getApiKey(): string | null {
+export function getApiKey(): string {
+  let keyFromEnv: string | undefined | null = null;
   if (typeof import.meta !== 'undefined' && import.meta.env) {
-    return (
+    keyFromEnv =
       import.meta.env.VITE_GEMINI_API_KEY ||
       import.meta.env.VITE_GOOGLE_API_KEY ||
       import.meta.env.GEMINI_API_KEY ||
-      null
-    );
+      null;
   }
 
-  if (typeof process !== 'undefined' && process.env) {
-    return (
+  if (!keyFromEnv && typeof process !== 'undefined' && process.env) {
+    keyFromEnv =
       process.env.REACT_APP_GEMINI_API_KEY ||
       process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
       process.env.GEMINI_API_KEY ||
-      null
-    );
+      null;
   }
 
-  return null;
+  const trimmedEnvKey = keyFromEnv?.trim();
+  const key = trimmedEnvKey ? trimmedEnvKey : HARDCODED_GEMINI_API_KEY.trim();
+  if (!key) {
+    throw new Error('Gemini key missing');
+  }
+
+  return key;
 }
 
 /**
  * Check if AI features are enabled
  */
 export function isAiEnabled(): boolean {
-  const key = getApiKey();
-  return !!key && key.length > 0;
+  try {
+    const key = getApiKey();
+    return !!key && key.length > 0;
+  } catch (error) {
+    return false;
+  }
 }
 
 type GeminiMessage = {
@@ -75,19 +86,9 @@ interface GeminiRequestOptions {
 }
 
 async function requestGemini({ model = DEFAULT_MODEL, contents, systemPrompt, generationConfig }: GeminiRequestOptions) {
-  const apiKey = getApiKey();
-  const modelsToTry = [
-    model,
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
-  ].filter((value, index, array) => array.indexOf(value) === index);
-  const keyParam = apiKey || '';
-  const urlKeyLabel = keyParam ? '***' : '';
-
-  if (!apiKey) {
-    console.error('[AI] Missing API key from env at runtime');
-  }
+  const key = getApiKey();
+  const modelName = model || DEFAULT_MODEL;
+  const urlKeyLabel = key ? '***' : '';
 
   const body = {
     contents,
@@ -98,35 +99,28 @@ async function requestGemini({ model = DEFAULT_MODEL, contents, systemPrompt, ge
     },
   };
 
-  for (const modelName of modelsToTry) {
-    const requestUrl = `${GEMINI_BASE_URL}/${modelName}:generateContent?key=${keyParam}`;
-    const logUrl = `${GEMINI_BASE_URL}/${modelName}:generateContent?key=${urlKeyLabel}`;
-    console.log('[AI] request url', logUrl);
+  const requestUrl = `${GEMINI_BASE_URL}/${modelName}:generateContent?key=${key}`;
+  const logUrl = `${GEMINI_BASE_URL}/${modelName}:generateContent?key=${urlKeyLabel}`;
+  console.log('[AI] Using key length:', key.length);
+  console.log('[AI] request url', logUrl);
 
-    const response = await fetch(requestUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
+  const response = await fetch(requestUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 
-    if (response.ok) {
-      console.log('[AI] model succeeded', { model: modelName });
-      return response.json();
-    }
-
-    if (response.status === 404) {
-      console.warn('[AI] model failed', { model: modelName, status: response.status });
-      continue;
-    }
-
-    const errorText = await response.text();
-    console.warn('[AI] model failed', { model: modelName, status: response.status });
-    throw new Error(`Gemini request failed: ${response.status} ${errorText}`);
+  if (response.ok) {
+    console.log('[AI] model succeeded', { model: modelName });
+    return response.json();
   }
 
-  throw new Error('Gemini request failed: no available model responded');
+  const errorText = await response.text();
+  console.warn('[AI] model failed', { model: modelName, status: response.status });
+  throw new Error(`Gemini request failed: ${response.status} ${errorText}`);
+
 }
 
 function extractGeminiText(data: any): string {

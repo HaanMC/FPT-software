@@ -31,7 +31,12 @@ function showToast(message: string, type: 'info' | 'error' | 'success' = 'info')
  */
 export function getApiKey(): string | null {
   if (typeof import.meta !== 'undefined' && import.meta.env) {
-    return import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || null;
+    return (
+      import.meta.env.VITE_GEMINI_API_KEY ||
+      import.meta.env.VITE_GOOGLE_API_KEY ||
+      import.meta.env.GEMINI_API_KEY ||
+      null
+    );
   }
 
   if (typeof process !== 'undefined' && process.env) {
@@ -71,8 +76,17 @@ interface GeminiRequestOptions {
 
 async function requestGemini({ model = DEFAULT_MODEL, contents, systemPrompt, generationConfig }: GeminiRequestOptions) {
   const apiKey = getApiKey();
+  const modelsToTry = [
+    model,
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+  ].filter((value, index, array) => array.indexOf(value) === index);
+  const keyParam = apiKey || '';
+  const urlKeyLabel = keyParam ? '***' : '';
+
   if (!apiKey) {
-    throw new Error('Missing Gemini API key');
+    console.error('[AI] Missing API key from env at runtime');
   }
 
   const body = {
@@ -84,20 +98,35 @@ async function requestGemini({ model = DEFAULT_MODEL, contents, systemPrompt, ge
     },
   };
 
-  const response = await fetch(`${GEMINI_BASE_URL}/${model}:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
+  for (const modelName of modelsToTry) {
+    const requestUrl = `${GEMINI_BASE_URL}/${modelName}:generateContent?key=${keyParam}`;
+    const logUrl = `${GEMINI_BASE_URL}/${modelName}:generateContent?key=${urlKeyLabel}`;
+    console.log('[AI] request url', logUrl);
 
-  if (!response.ok) {
+    const response = await fetch(requestUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (response.ok) {
+      console.log('[AI] model succeeded', { model: modelName });
+      return response.json();
+    }
+
+    if (response.status === 404) {
+      console.warn('[AI] model failed', { model: modelName, status: response.status });
+      continue;
+    }
+
     const errorText = await response.text();
+    console.warn('[AI] model failed', { model: modelName, status: response.status });
     throw new Error(`Gemini request failed: ${response.status} ${errorText}`);
   }
 
-  return response.json();
+  throw new Error('Gemini request failed: no available model responded');
 }
 
 function extractGeminiText(data: any): string {
@@ -284,6 +313,12 @@ export async function sendChatMessage(
     role: msg.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: msg.content }],
   }));
+
+  console.log('[AI] sendChat start', {
+    hasKey: !!getApiKey(),
+    model: DEFAULT_MODEL,
+    msgCount: conversationParts.length,
+  });
 
   const data = await requestGemini({
     contents: conversationParts,

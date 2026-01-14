@@ -349,7 +349,7 @@ export const en = {
     retry: 'Retry',
     errorResponse: 'Something went wrong. Please try again.',
     aiUnreachableToast: "Couldn't reach AI. Try again.",
-    aiUnreachableMessage: "I couldn’t reach the AI service right now. Please try again.",
+    aiUnreachableMessage: "Couldn't reach AI. Try again.",
   },
 
   // Inbox

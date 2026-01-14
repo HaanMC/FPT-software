@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useGlobal } from '../context/GlobalContext';
 import { useT, useLanguage } from '../i18n';
 import { isAiEnabled, sendChatMessage } from '../lib/ai/geminiClient';
-import { Card, Button, Badge, Input, Modal, Toggle } from '../components/ui';
+import { Button, Badge, Input, Modal, Toggle } from '../components/ui';
 import { Conversation, ChatMessage, ChatContextOptions } from '../types';
 import {
   MessageCircle,
@@ -16,11 +16,9 @@ import {
   Send,
   Trash2,
   Edit3,
-  ChevronRight,
   User,
   Bot,
   Lightbulb,
-  BookOpen,
   HelpCircle,
   FileText,
   Brain,
@@ -28,10 +26,10 @@ import {
   CheckSquare,
   Clock,
   Target,
-  Zap,
   MoreHorizontal,
-  X,
   Loader2,
+  Copy,
+  RotateCcw,
 } from 'lucide-react';
 
 export const ChatPage: React.FC = () => {
@@ -43,6 +41,7 @@ export const ChatPage: React.FC = () => {
     setActiveConversation,
     addMessageToConversation,
     getActiveConversation,
+    getConversationMessages,
     showToast,
   } = useGlobal();
   const t = useT();
@@ -55,6 +54,11 @@ export const ChatPage: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null);
   const [showRenameModal, setShowRenameModal] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [retryInfo, setRetryInfo] = useState<{
+    conversationId: string;
+    userMessage: string;
+    assistantMessageId: string;
+  } | null>(null);
   const [contextOptions, setContextOptions] = useState<ChatContextOptions>({
     includeTasks: true,
     includeProject: true,
@@ -67,12 +71,13 @@ export const ChatPage: React.FC = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const activeConversation = getActiveConversation();
+  const activeMessages = getConversationMessages(activeConversation?.id || null);
   const aiEnabled = isAiEnabled();
 
   // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeConversation?.messages.length]);
+  }, [activeMessages.length]);
 
   // Group conversations by date
   const groupedConversations = useMemo(() => {
@@ -87,11 +92,15 @@ export const ChatPage: React.FC = () => {
     };
 
     const filtered = searchQuery
-      ? state.conversations.filter((c) =>
-          c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          c.messages.some((m) => m.content.toLowerCase().includes(searchQuery.toLowerCase()))
-        )
-      : state.conversations;
+      ? state.chat.conversations.filter((c) => {
+        const matchesTitle = c.title.toLowerCase().includes(searchQuery.toLowerCase());
+        const messages = state.chat.messagesByConvId[c.id] || [];
+        const matchesMessage = messages.some((m) =>
+          m.content.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        return matchesTitle || matchesMessage;
+      })
+      : state.chat.conversations;
 
     filtered.forEach((conv) => {
       const convDate = new Date(conv.updatedAt).toDateString();
@@ -105,7 +114,7 @@ export const ChatPage: React.FC = () => {
     });
 
     return groups;
-  }, [state.conversations, searchQuery]);
+  }, [state.chat.conversations, state.chat.messagesByConvId, searchQuery]);
 
   // Build context string
   const buildContext = (): string => {
@@ -115,6 +124,8 @@ export const ChatPage: React.FC = () => {
       parts.push(`Student name: ${state.settings.userName}`);
     }
 
+    parts.push(`Preferred language: ${language === 'vi' ? 'Vietnamese' : 'English'}`);
+
     if (contextOptions.includeTasks) {
       const todayTasks = state.tasks
         .filter((t) => t.status !== 'done')
@@ -123,6 +134,16 @@ export const ChatPage: React.FC = () => {
       if (todayTasks.length > 0) {
         parts.push(`Today's tasks:\n${todayTasks.join('\n')}`);
       }
+    }
+
+    const activeTask = state.tasks.find((t) => t.status === 'in_progress');
+    if (activeTask) {
+      parts.push(`Active task: ${activeTask.title}`);
+    }
+
+    const todayTodos = state.todos.filter((todo) => !todo.done).slice(0, 5);
+    if (todayTodos.length > 0) {
+      parts.push(`Today's todos:\n${todayTodos.map((todo) => `- ${todo.title}`).join('\n')}`);
     }
 
     if (contextOptions.includeProject) {
@@ -178,7 +199,7 @@ export const ChatPage: React.FC = () => {
     const action = quickActions.find((a) => a.id === actionId);
     if (!action) return;
 
-    let convId = state.activeConversationId;
+    let convId = state.chat.activeConversationId;
     if (!convId) {
       const conv = addConversation(action.label);
       convId = conv.id;
@@ -196,10 +217,10 @@ export const ChatPage: React.FC = () => {
       let response: string;
       if (aiEnabled) {
         const context = buildContext();
-        const messages = activeConversation?.messages.map((m) => ({
+        const messages = (state.chat.messagesByConvId[convId] || []).map((m) => ({
           role: m.role as 'user' | 'assistant',
           content: m.content,
-        })) || [];
+        }));
         messages.push({ role: 'user', content: action.label });
 
         response = await sendChatMessage(messages, { language, context });
@@ -213,7 +234,17 @@ export const ChatPage: React.FC = () => {
         role: 'assistant',
         content: response,
       });
+      setRetryInfo(null);
     } catch (error) {
+      const errorMessage = addMessageToConversation(convId, {
+        role: 'assistant',
+        content: t.chat.errorResponse,
+      });
+      setRetryInfo({
+        conversationId: convId,
+        userMessage: action.label,
+        assistantMessageId: errorMessage.id,
+      });
       showToast(t.common.error, 'error');
     } finally {
       setIsLoading(false);
@@ -226,7 +257,7 @@ export const ChatPage: React.FC = () => {
     const message = inputValue.trim();
     setInputValue('');
 
-    let convId = state.activeConversationId;
+    let convId = state.chat.activeConversationId;
     if (!convId) {
       const conv = addConversation(message.slice(0, 30) + (message.length > 30 ? '...' : ''));
       convId = conv.id;
@@ -244,31 +275,63 @@ export const ChatPage: React.FC = () => {
       let response: string;
       if (aiEnabled) {
         const context = buildContext();
-        const currentConv = state.conversations.find((c) => c.id === convId);
-        const messages = currentConv?.messages.map((m) => ({
+        const messages = (state.chat.messagesByConvId[convId] || []).map((m) => ({
           role: m.role as 'user' | 'assistant',
           content: m.content,
-        })) || [];
+        }));
         messages.push({ role: 'user', content: message });
 
         response = await sendChatMessage(messages, { language, context });
       } else {
         await new Promise((resolve) => setTimeout(resolve, 500));
-        response = language === 'vi'
-          ? "AI đang ở chế độ ngoại tuyến. Hãy thử các hành động nhanh ở trên để nhận hướng dẫn học tập mẫu."
-          : "AI is in offline mode. Try the quick actions above for template study guidance.";
+        response = t.chat.offlineMessage;
       }
 
-      addMessageToConversation(convId, {
+      const assistantMessage = addMessageToConversation(convId, {
         role: 'assistant',
         content: response,
       });
 
       // Update conversation title if first message
-      const conv = state.conversations.find((c) => c.id === convId);
-      if (conv && conv.messages.length <= 2) {
+      const conv = state.chat.conversations.find((c) => c.id === convId);
+      const messageCount = (state.chat.messagesByConvId[convId]?.length || 0) + 1;
+      if (conv && messageCount <= 1) {
         updateConversation(convId, { title: message.slice(0, 40) + (message.length > 40 ? '...' : '') });
       }
+
+      setRetryInfo(null);
+    } catch (error) {
+      const errorMessage = addMessageToConversation(convId, {
+        role: 'assistant',
+        content: t.chat.errorResponse,
+      });
+      setRetryInfo({
+        conversationId: convId,
+        userMessage: message,
+        assistantMessageId: errorMessage.id,
+      });
+      showToast(t.common.error, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRetry = async () => {
+    if (!retryInfo || isLoading) return;
+    setIsLoading(true);
+    try {
+      const context = buildContext();
+      const messages = (state.chat.messagesByConvId[retryInfo.conversationId] || []).map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }));
+      messages.push({ role: 'user', content: retryInfo.userMessage });
+      const response = await sendChatMessage(messages, { language, context });
+      addMessageToConversation(retryInfo.conversationId, {
+        role: 'assistant',
+        content: response,
+      });
+      setRetryInfo(null);
     } catch (error) {
       showToast(t.common.error, 'error');
     } finally {
@@ -303,6 +366,8 @@ export const ChatPage: React.FC = () => {
 
   // Calculate context data for panel
   const todayTasks = state.tasks.filter((t) => t.status !== 'done').slice(0, 5);
+  const todayTodos = state.todos.filter((todo) => !todo.done).slice(0, 5);
+  const activeTask = state.tasks.find((t) => t.status === 'in_progress') || null;
   const flashcardsDue = state.decks.reduce((acc, deck) => {
     const today = new Date().toISOString().split('T')[0];
     return acc + deck.cards.filter((c) => c.nextReviewDate <= today).length;
@@ -352,7 +417,7 @@ export const ChatPage: React.FC = () => {
                 <ConversationItem
                   key={conv.id}
                   conversation={conv}
-                  isActive={conv.id === state.activeConversationId}
+                  isActive={conv.id === state.chat.activeConversationId}
                   onClick={() => setActiveConversation(conv.id)}
                   onDelete={() => setShowDeleteModal(conv.id)}
                   onRename={() => {
@@ -371,7 +436,7 @@ export const ChatPage: React.FC = () => {
                 <ConversationItem
                   key={conv.id}
                   conversation={conv}
-                  isActive={conv.id === state.activeConversationId}
+                  isActive={conv.id === state.chat.activeConversationId}
                   onClick={() => setActiveConversation(conv.id)}
                   onDelete={() => setShowDeleteModal(conv.id)}
                   onRename={() => {
@@ -390,7 +455,7 @@ export const ChatPage: React.FC = () => {
                 <ConversationItem
                   key={conv.id}
                   conversation={conv}
-                  isActive={conv.id === state.activeConversationId}
+                  isActive={conv.id === state.chat.activeConversationId}
                   onClick={() => setActiveConversation(conv.id)}
                   onDelete={() => setShowDeleteModal(conv.id)}
                   onRename={() => {
@@ -402,7 +467,7 @@ export const ChatPage: React.FC = () => {
             </div>
           )}
 
-          {state.conversations.length === 0 && (
+          {state.chat.conversations.length === 0 && (
             <div className="text-center py-8 px-4">
               <MessageCircle className="w-10 h-10 text-gray-300 mx-auto mb-2" />
               <p className="text-sm text-gray-500">{t.chat.noChats}</p>
@@ -425,13 +490,31 @@ export const ChatPage: React.FC = () => {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {activeConversation?.messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
-          ))}
+          {activeMessages.length === 0 ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center">
+                <MessageCircle className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+                <p className="text-sm text-gray-500">{t.chat.startConversation}</p>
+                <Button className="mt-4" onClick={handleNewChat}>
+                  <Plus className="w-4 h-4" />
+                  {t.chat.startNewChat}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            activeMessages.map((message) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                showRetry={retryInfo?.assistantMessageId === message.id}
+                onRetry={handleRetry}
+              />
+            ))
+          )}
           {isLoading && (
             <div className="flex items-center gap-2 text-gray-500">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm">{t.chat.thinking}</span>
+              <span className="text-sm">{t.chat.generating}</span>
             </div>
           )}
           <div ref={messagesEndRef} />
@@ -464,20 +547,20 @@ export const ChatPage: React.FC = () => {
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={t.chat.typeMessage}
-              disabled={isLoading}
+              disabled={!aiEnabled || isLoading}
               rows={2}
               className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none disabled:opacity-50"
             />
             <Button
               onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isLoading}
+              disabled={!inputValue.trim() || isLoading || !aiEnabled}
               size="lg"
             >
               {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
             </Button>
           </div>
           <p className="text-xs text-gray-400 mt-1">
-            Enter to send, Shift+Enter for new line
+            {t.chat.enterToSend}
           </p>
         </div>
       </div>
@@ -494,9 +577,36 @@ export const ChatPage: React.FC = () => {
           <div className="mb-4 p-3 bg-white rounded-lg border border-gray-200">
             <p className="text-xs font-medium text-gray-500 mb-1">{t.chat.userInfo}</p>
             <p className="text-sm text-gray-900">{state.settings.userName}</p>
-            <p className="text-xs text-gray-500">{language === 'vi' ? 'Tiếng Việt' : 'English'}</p>
+            <p className="text-xs text-gray-500">{language === 'vi' ? t.settings.vietnamese : t.settings.english}</p>
           </div>
         )}
+
+        {/* Active Task */}
+        <div className="mb-4 p-3 bg-white rounded-lg border border-gray-200">
+          <p className="text-xs font-medium text-gray-500 mb-1">{t.chat.activeTask}</p>
+          {activeTask ? (
+            <p className="text-sm text-gray-700">{activeTask.title}</p>
+          ) : (
+            <p className="text-xs text-gray-400">{t.chat.noActiveTask}</p>
+          )}
+        </div>
+
+        {/* Today's Todos */}
+        <div className="mb-4">
+          <p className="text-xs font-medium text-gray-500 mb-2">{t.chat.todayTodos}</p>
+          <div className="space-y-1">
+            {todayTodos.length > 0 ? (
+              todayTodos.map((todo) => (
+                <div key={todo.id} className="flex items-center gap-2 text-sm text-gray-700">
+                  <CheckSquare className="w-3 h-3 text-gray-400" />
+                  <span className="truncate">{todo.title}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-xs text-gray-400">{t.chat.noTodos}</p>
+            )}
+          </div>
+        </div>
 
         {/* Today's Tasks */}
         <div className="mb-4">
@@ -516,7 +626,7 @@ export const ChatPage: React.FC = () => {
                 </div>
               ))
             ) : (
-              <p className="text-xs text-gray-400">No tasks</p>
+              <p className="text-xs text-gray-400">{t.chat.noTasks}</p>
             )}
           </div>
         </div>
@@ -548,7 +658,7 @@ export const ChatPage: React.FC = () => {
                 </div>
               ))
             ) : (
-              <p className="text-xs text-gray-400">No recent sessions</p>
+              <p className="text-xs text-gray-400">{t.chat.noRecentSessions}</p>
             )}
           </div>
         </div>
@@ -568,7 +678,7 @@ export const ChatPage: React.FC = () => {
                 <Badge key={topic} variant="warning" size="sm">{topic}</Badge>
               ))
             ) : (
-              <p className="text-xs text-gray-400">None</p>
+              <p className="text-xs text-gray-400">{t.chat.none}</p>
             )}
           </div>
         </div>
@@ -588,7 +698,7 @@ export const ChatPage: React.FC = () => {
                 <Badge key={distraction} variant="danger" size="sm">{distraction}</Badge>
               ))
             ) : (
-              <p className="text-xs text-gray-400">None</p>
+              <p className="text-xs text-gray-400">{t.chat.none}</p>
             )}
           </div>
         </div>
@@ -653,6 +763,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   onRename,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
+  const t = useT();
 
   return (
     <div
@@ -687,7 +798,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
             >
               <Edit3 className="w-4 h-4" />
-              Rename
+              {t.chat.rename}
             </button>
             <button
               onClick={(e) => {
@@ -698,7 +809,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
               className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-red-600 flex items-center gap-2"
             >
               <Trash2 className="w-4 h-4" />
-              Delete
+              {t.common.delete}
             </button>
           </div>
         </>
@@ -707,13 +818,92 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   );
 };
 
+const renderInlineMarkdown = (text: string) => {
+  const parts: React.ReactNode[] = [];
+  let remaining = text;
+  const tokenRegex = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/;
+  while (remaining.length > 0) {
+    const match = remaining.match(tokenRegex);
+    if (!match || match.index === undefined) {
+      parts.push(remaining);
+      break;
+    }
+    if (match.index > 0) {
+      parts.push(remaining.slice(0, match.index));
+    }
+    const token = match[0];
+    if (token.startsWith('**')) {
+      parts.push(<strong key={`${token}-${parts.length}`}>{token.slice(2, -2)}</strong>);
+    } else if (token.startsWith('`')) {
+      parts.push(
+        <code key={`${token}-${parts.length}`} className="px-1 py-0.5 rounded bg-gray-100 text-gray-800 text-xs">
+          {token.slice(1, -1)}
+        </code>
+      );
+    } else if (token.startsWith('*')) {
+      parts.push(<em key={`${token}-${parts.length}`}>{token.slice(1, -1)}</em>);
+    }
+    remaining = remaining.slice(match.index + token.length);
+  }
+  return parts;
+};
+
+const renderMarkdown = (content: string) => {
+  return content.split('\n').map((line, i) => {
+    if (line.startsWith('### ')) {
+      return <h3 key={i} className="text-sm font-semibold mt-3 mb-2">{line.slice(4)}</h3>;
+    }
+    if (line.startsWith('## ')) {
+      return <h2 key={i} className="text-base font-semibold mt-3 mb-2">{line.slice(3)}</h2>;
+    }
+    if (line.startsWith('# ')) {
+      return <h1 key={i} className="text-lg font-semibold mt-3 mb-2">{line.slice(2)}</h1>;
+    }
+    if (line.startsWith('> ')) {
+      return (
+        <blockquote key={i} className="border-l-2 border-gray-300 pl-3 text-gray-600 italic">
+          {renderInlineMarkdown(line.slice(2))}
+        </blockquote>
+      );
+    }
+    if (line.startsWith('- ')) {
+      return (
+        <p key={i} className="ml-4">
+          • {renderInlineMarkdown(line.slice(2))}
+        </p>
+      );
+    }
+    if (line === '---') {
+      return <hr key={i} className="my-3" />;
+    }
+    return (
+      <p key={i} className="mb-2">
+        {renderInlineMarkdown(line || '\u00A0')}
+      </p>
+    );
+  });
+};
+
 // Message Bubble Component
 interface MessageBubbleProps {
   message: ChatMessage;
+  showRetry?: boolean;
+  onRetry?: () => void;
 }
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = ({ message, showRetry, onRetry }) => {
   const isUser = message.role === 'user';
+  const t = useT();
+  const { showToast } = useGlobal();
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      showToast(t.chat.copySuccess, 'success');
+    } catch (error) {
+      showToast(t.common.error, 'error');
+    }
+  };
 
   return (
     <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
@@ -724,17 +914,43 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
       >
         {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
       </div>
-      <div
-        className={`max-w-[70%] px-4 py-3 rounded-lg ${
-          isUser
-            ? 'bg-indigo-600 text-white'
-            : 'bg-white border border-gray-200 text-gray-800'
-        }`}
-      >
-        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-        <p className={`text-xs mt-1 ${isUser ? 'text-indigo-200' : 'text-gray-400'}`}>
-          {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </p>
+      <div className={`group max-w-[70%] ${isUser ? 'text-white' : 'text-gray-800'}`}>
+        <div
+          className={`px-4 py-3 rounded-lg ${
+            isUser
+              ? 'bg-indigo-600'
+              : 'bg-white border border-gray-200'
+          }`}
+        >
+          {isUser ? (
+            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+          ) : (
+            <div className="text-sm space-y-1">{renderMarkdown(message.content)}</div>
+          )}
+          <p className={`text-xs mt-2 ${isUser ? 'text-indigo-200' : 'text-gray-400'}`}>
+            {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </p>
+        </div>
+        {!isUser && (
+          <div className="flex items-center gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={handleCopy}
+              className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+            >
+              <Copy className="w-3 h-3" />
+              {t.chat.copy}
+            </button>
+            {showRetry && onRetry && (
+              <button
+                onClick={onRetry}
+                className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+              >
+                <RotateCcw className="w-3 h-3" />
+                {t.chat.retry}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

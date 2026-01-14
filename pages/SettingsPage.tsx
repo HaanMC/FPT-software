@@ -6,9 +6,8 @@
 import React, { useRef } from 'react';
 import { useGlobal } from '../context/GlobalContext';
 import { exportData, importData } from '../lib/storage/store';
-import { isAiEnabled } from '../lib/ai/geminiClient';
 import { useT } from '../i18n';
-import { Card, Button, Input, Badge, SegmentedControl } from '../components/ui';
+import { Card, Button, Input, SegmentedControl } from '../components/ui';
 import { Theme, Language } from '../types';
 import {
   Settings,
@@ -17,8 +16,6 @@ import {
   Download,
   Upload,
   Sparkles,
-  AlertCircle,
-  CheckCircle,
   Trash2,
   Palette,
   User,
@@ -239,33 +236,6 @@ export const SettingsPage: React.FC = () => {
           <Sparkles className="w-5 h-5 text-gray-400" />
           {t.settings.aiFeatures}
         </h2>
-
-        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-          <div className="flex items-center gap-3">
-            {isAiEnabled() ? (
-              <>
-                <CheckCircle className="w-5 h-5 text-green-500" />
-                <div>
-                  <p className="font-medium text-gray-900">{t.settings.aiEnabled}</p>
-                  <p className="text-xs text-gray-500">{t.settings.aiConfigured}</p>
-                </div>
-              </>
-            ) : (
-              <>
-                <AlertCircle className="w-5 h-5 text-amber-500" />
-                <div>
-                  <p className="font-medium text-gray-900">{t.settings.aiDisabled}</p>
-                  <p className="text-xs text-gray-500">
-                    {t.settings.aiMissing}
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-          <Badge variant={isAiEnabled() ? 'success' : 'warning'}>
-            {isAiEnabled() ? t.settings.aiActive : t.settings.aiInactive}
-          </Badge>
-        </div>
 
         <p className="text-xs text-gray-400">
           {t.settings.aiDescription}{' '}

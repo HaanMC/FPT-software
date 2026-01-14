@@ -348,6 +348,8 @@ export const en = {
     copySuccess: 'Copied to clipboard',
     retry: 'Retry',
     errorResponse: 'Something went wrong. Please try again.',
+    aiUnreachableToast: "Couldn't reach AI. Try again.",
+    aiUnreachableMessage: "I couldn’t reach the AI service right now. Please try again.",
   },
 
   // Inbox

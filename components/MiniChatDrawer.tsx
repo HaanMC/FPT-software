@@ -5,7 +5,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useGlobal } from '../context/GlobalContext';
 import { useT, useLanguage } from '../i18n';
-import { isAiEnabled, sendChatMessage } from '../lib/ai/geminiClient';
+import { sendChatMessage } from '../lib/ai/geminiClient';
 import { Button, Drawer } from './ui';
 import { ChatMessage } from '../types';
 import {
@@ -15,7 +15,6 @@ import {
   Bot,
   Lightbulb,
   Brain,
-  AlertCircle,
 } from 'lucide-react';
 
 export const MiniChatDrawer: React.FC = () => {
@@ -37,7 +36,6 @@ export const MiniChatDrawer: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const activeConversation = getActiveConversation();
-  const aiEnabled = isAiEnabled();
   const messages = getConversationMessages(activeConversation?.id || null).slice(-20);
 
   useEffect(() => {
@@ -78,26 +76,19 @@ export const MiniChatDrawer: React.FC = () => {
     setIsLoading(true);
 
     try {
-      let response: string;
-      if (aiEnabled) {
-        const context = buildContext();
-        const chatMessages = (state.chat.messagesByConvId[convId] || []).map((m) => ({
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-        }));
-        chatMessages.push({ role: 'user', content: text });
+      const context = buildContext();
+      const chatMessages = (state.chat.messagesByConvId[convId] || []).map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }));
+      chatMessages.push({ role: 'user', content: text });
 
-        response = await sendChatMessage(chatMessages, { language, context });
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        response = text.includes(t.chat.quizMe)
-          ? t.offline.quizMe
-          : t.offline.explainConcept;
-      }
+      const response = await sendChatMessage(chatMessages, { language, context });
 
       addMessageToConversation(convId, { role: 'assistant', content: response });
     } catch (error) {
-      showToast(t.common.error, 'error');
+      addMessageToConversation(convId, { role: 'assistant', content: t.chat.aiUnreachableMessage });
+      showToast(t.chat.aiUnreachableToast, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -115,14 +106,6 @@ export const MiniChatDrawer: React.FC = () => {
   return (
     <Drawer open={miniChatOpen} onClose={() => setMiniChatOpen(false)} title={t.chat.miniChat} width="md">
       <div className="flex flex-col h-full">
-        {/* AI Status */}
-        {!aiEnabled && (
-          <div className="px-3 py-2 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-amber-600" />
-            <span className="text-xs text-amber-700">{t.chat.aiUnavailable}</span>
-          </div>
-        )}
-
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
           {messages.length === 0 ? (
@@ -168,12 +151,11 @@ export const MiniChatDrawer: React.FC = () => {
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={t.chat.typeMessage}
-              disabled={!aiEnabled || isLoading}
-              className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50"
+              className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
             <Button
               onClick={() => handleSendMessage()}
-              disabled={!inputValue.trim() || isLoading || !aiEnabled}
+              disabled={!inputValue.trim() || isLoading}
               size="md"
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

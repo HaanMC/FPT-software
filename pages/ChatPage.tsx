@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useGlobal } from '../context/GlobalContext';
 import { useT, useLanguage } from '../i18n';
-import { isAiEnabled, sendChatMessage } from '../lib/ai/geminiClient';
+import { sendChatMessage } from '../lib/ai/geminiClient';
 import { Button, Badge, Input, Modal, Toggle } from '../components/ui';
 import { Conversation, ChatMessage, ChatContextOptions } from '../types';
 import {
@@ -22,7 +22,6 @@ import {
   HelpCircle,
   FileText,
   Brain,
-  AlertCircle,
   CheckSquare,
   Clock,
   Target,
@@ -72,7 +71,6 @@ export const ChatPage: React.FC = () => {
 
   const activeConversation = getActiveConversation();
   const activeMessages = getConversationMessages(activeConversation?.id || null);
-  const aiEnabled = isAiEnabled();
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -184,17 +182,6 @@ export const ChatPage: React.FC = () => {
     { id: 'quiz', label: t.chat.quizMe, icon: <Brain className="w-4 h-4" /> },
   ];
 
-  const getOfflineResponse = (actionId: string): string => {
-    const responses: Record<string, string> = {
-      explain: t.offline.explainConcept,
-      plan: t.offline.studyPlan,
-      questions: t.offline.practiceQuestions,
-      summarize: t.offline.summarizeNotes,
-      quiz: t.offline.quizMe,
-    };
-    return responses[actionId] || t.offline.explainConcept;
-  };
-
   const handleQuickAction = async (actionId: string) => {
     const action = quickActions.find((a) => a.id === actionId);
     if (!action) return;
@@ -214,21 +201,14 @@ export const ChatPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      let response: string;
-      if (aiEnabled) {
-        const context = buildContext();
-        const messages = (state.chat.messagesByConvId[convId] || []).map((m) => ({
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-        }));
-        messages.push({ role: 'user', content: action.label });
+      const context = buildContext();
+      const messages = (state.chat.messagesByConvId[convId] || []).map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }));
+      messages.push({ role: 'user', content: action.label });
 
-        response = await sendChatMessage(messages, { language, context });
-      } else {
-        // Offline fallback
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        response = getOfflineResponse(actionId);
-      }
+      const response = await sendChatMessage(messages, { language, context });
 
       addMessageToConversation(convId, {
         role: 'assistant',
@@ -238,14 +218,14 @@ export const ChatPage: React.FC = () => {
     } catch (error) {
       const errorMessage = addMessageToConversation(convId, {
         role: 'assistant',
-        content: t.chat.errorResponse,
+        content: t.chat.aiUnreachableMessage,
       });
       setRetryInfo({
         conversationId: convId,
         userMessage: action.label,
         assistantMessageId: errorMessage.id,
       });
-      showToast(t.common.error, 'error');
+      showToast(t.chat.aiUnreachableToast, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -272,20 +252,14 @@ export const ChatPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      let response: string;
-      if (aiEnabled) {
-        const context = buildContext();
-        const messages = (state.chat.messagesByConvId[convId] || []).map((m) => ({
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-        }));
-        messages.push({ role: 'user', content: message });
+      const context = buildContext();
+      const messages = (state.chat.messagesByConvId[convId] || []).map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }));
+      messages.push({ role: 'user', content: message });
 
-        response = await sendChatMessage(messages, { language, context });
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        response = t.chat.offlineMessage;
-      }
+      const response = await sendChatMessage(messages, { language, context });
 
       const assistantMessage = addMessageToConversation(convId, {
         role: 'assistant',
@@ -303,14 +277,14 @@ export const ChatPage: React.FC = () => {
     } catch (error) {
       const errorMessage = addMessageToConversation(convId, {
         role: 'assistant',
-        content: t.chat.errorResponse,
+        content: t.chat.aiUnreachableMessage,
       });
       setRetryInfo({
         conversationId: convId,
         userMessage: message,
         assistantMessageId: errorMessage.id,
       });
-      showToast(t.common.error, 'error');
+      showToast(t.chat.aiUnreachableToast, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -333,7 +307,16 @@ export const ChatPage: React.FC = () => {
       });
       setRetryInfo(null);
     } catch (error) {
-      showToast(t.common.error, 'error');
+      const errorMessage = addMessageToConversation(retryInfo.conversationId, {
+        role: 'assistant',
+        content: t.chat.aiUnreachableMessage,
+      });
+      setRetryInfo({
+        conversationId: retryInfo.conversationId,
+        userMessage: retryInfo.userMessage,
+        assistantMessageId: errorMessage.id,
+      });
+      showToast(t.chat.aiUnreachableToast, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -479,15 +462,6 @@ export const ChatPage: React.FC = () => {
 
       {/* Chat Area (Center) */}
       <div className="flex-1 flex flex-col">
-        {/* AI Status Banner */}
-        {!aiEnabled && (
-          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-amber-600" />
-            <span className="text-sm text-amber-700">{t.chat.aiUnavailable}</span>
-            <Badge variant="warning" size="sm">{t.chat.offlineMode}</Badge>
-          </div>
-        )}
-
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {activeMessages.length === 0 ? (
@@ -547,13 +521,12 @@ export const ChatPage: React.FC = () => {
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={t.chat.typeMessage}
-              disabled={!aiEnabled || isLoading}
               rows={2}
-              className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none disabled:opacity-50"
+              className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
             />
             <Button
               onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isLoading || !aiEnabled}
+              disabled={!inputValue.trim() || isLoading}
               size="lg"
             >
               {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}

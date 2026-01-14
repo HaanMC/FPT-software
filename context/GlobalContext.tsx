@@ -16,7 +16,12 @@ import {
   Achievement,
   TaskStatus,
   TaskPriority,
+  Conversation,
+  ChatMessage,
+  Language,
+  Theme,
 } from '../types';
+import { LanguageContext } from '../i18n';
 import { loadState, saveState, generateId } from '../lib/storage/store';
 
 // Toast types
@@ -71,6 +76,18 @@ interface GlobalContextType {
 
   // Settings
   updateSettings: (updates: Partial<AppState['settings']['timer']>) => void;
+  updateAppSettings: (updates: Partial<AppState['settings']>) => void;
+  setTheme: (theme: Theme) => void;
+  setLanguage: (language: Language) => void;
+  setUserName: (name: string) => void;
+
+  // Conversations
+  addConversation: (title?: string) => Conversation;
+  updateConversation: (id: string, updates: Partial<Conversation>) => void;
+  deleteConversation: (id: string) => void;
+  setActiveConversation: (id: string | null) => void;
+  addMessageToConversation: (conversationId: string, message: Omit<ChatMessage, 'id' | 'createdAt'>) => ChatMessage;
+  getActiveConversation: () => Conversation | null;
 
   // Favorites
   toggleFavorite: (path: string) => void;
@@ -86,6 +103,8 @@ interface GlobalContextType {
   setZenMode: (value: boolean) => void;
   commandPaletteOpen: boolean;
   setCommandPaletteOpen: (value: boolean) => void;
+  miniChatOpen: boolean;
+  setMiniChatOpen: (value: boolean) => void;
 }
 
 const GlobalContext = createContext<GlobalContextType | undefined>(undefined);
@@ -95,6 +114,7 @@ export const GlobalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [isZenMode, setZenMode] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [miniChatOpen, setMiniChatOpen] = useState(false);
 
   // Persist state changes
   useEffect(() => {
@@ -454,6 +474,102 @@ export const GlobalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }));
   }, []);
 
+  const updateAppSettings = useCallback((updates: Partial<AppState['settings']>) => {
+    setState((prev) => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        ...updates,
+      },
+    }));
+  }, []);
+
+  const setTheme = useCallback((theme: Theme) => {
+    setState((prev) => ({
+      ...prev,
+      settings: { ...prev.settings, theme },
+    }));
+  }, []);
+
+  const setLanguage = useCallback((language: Language) => {
+    setState((prev) => ({
+      ...prev,
+      settings: { ...prev.settings, language },
+    }));
+  }, []);
+
+  const setUserName = useCallback((userName: string) => {
+    setState((prev) => ({
+      ...prev,
+      settings: { ...prev.settings, userName: userName.slice(0, 24) },
+    }));
+  }, []);
+
+  // ============================================
+  // Conversation Operations
+  // ============================================
+  const addConversation = useCallback((title?: string): Conversation => {
+    const now = new Date().toISOString();
+    const conversation: Conversation = {
+      id: generateId('conv'),
+      title: title || 'New Chat',
+      messages: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+    setState((prev) => ({
+      ...prev,
+      conversations: [conversation, ...prev.conversations],
+      activeConversationId: conversation.id,
+    }));
+    return conversation;
+  }, []);
+
+  const updateConversation = useCallback((id: string, updates: Partial<Conversation>) => {
+    setState((prev) => ({
+      ...prev,
+      conversations: prev.conversations.map((c) =>
+        c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c
+      ),
+    }));
+  }, []);
+
+  const deleteConversation = useCallback((id: string) => {
+    setState((prev) => ({
+      ...prev,
+      conversations: prev.conversations.filter((c) => c.id !== id),
+      activeConversationId: prev.activeConversationId === id ? null : prev.activeConversationId,
+    }));
+  }, []);
+
+  const setActiveConversation = useCallback((id: string | null) => {
+    setState((prev) => ({ ...prev, activeConversationId: id }));
+  }, []);
+
+  const addMessageToConversation = useCallback(
+    (conversationId: string, messageData: Omit<ChatMessage, 'id' | 'createdAt'>): ChatMessage => {
+      const message: ChatMessage = {
+        ...messageData,
+        id: generateId('msg'),
+        createdAt: new Date().toISOString(),
+      };
+      setState((prev) => ({
+        ...prev,
+        conversations: prev.conversations.map((c) =>
+          c.id === conversationId
+            ? { ...c, messages: [...c.messages, message], updatedAt: new Date().toISOString() }
+            : c
+        ),
+      }));
+      return message;
+    },
+    []
+  );
+
+  const getActiveConversation = useCallback((): Conversation | null => {
+    return state.conversations.find((c) => c.id === state.activeConversationId) || null;
+  }, [state.conversations, state.activeConversationId]);
+
   // ============================================
   // Favorites Operations
   // ============================================
@@ -514,6 +630,16 @@ export const GlobalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     updateSession,
     checkAchievements,
     updateSettings,
+    updateAppSettings,
+    setTheme,
+    setLanguage,
+    setUserName,
+    addConversation,
+    updateConversation,
+    deleteConversation,
+    setActiveConversation,
+    addMessageToConversation,
+    getActiveConversation,
     toggleFavorite,
     isFavorite,
     toasts,
@@ -523,9 +649,17 @@ export const GlobalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setZenMode,
     commandPaletteOpen,
     setCommandPaletteOpen,
+    miniChatOpen,
+    setMiniChatOpen,
   };
 
-  return <GlobalContext.Provider value={value}>{children}</GlobalContext.Provider>;
+  return (
+    <GlobalContext.Provider value={value}>
+      <LanguageContext.Provider value={state.settings.language}>
+        {children}
+      </LanguageContext.Provider>
+    </GlobalContext.Provider>
+  );
 };
 
 export const useGlobal = () => {

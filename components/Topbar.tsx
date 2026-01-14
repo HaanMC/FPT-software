@@ -5,39 +5,61 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useGlobal } from '../context/GlobalContext';
+import { useT } from '../i18n';
 import {
   ChevronRight,
   Search,
   Plus,
   Star,
   StarOff,
-  Command,
   Bell,
 } from 'lucide-react';
 import { Button, Kbd, Badge } from './ui';
-
-// Route title mapping
-const routeTitles: Record<string, { title: string; subtitle?: string }> = {
-  '/dashboard': { title: 'Dashboard', subtitle: 'Your study overview' },
-  '/inbox': { title: 'Inbox', subtitle: 'Quick capture & triage' },
-  '/tasks': { title: 'Tasks', subtitle: 'Manage your work' },
-  '/projects': { title: 'Projects', subtitle: 'Subjects & cycles' },
-  '/notes': { title: 'Notes', subtitle: 'Your knowledge base' },
-  '/flashcards': { title: 'Flashcards', subtitle: 'Spaced repetition' },
-  '/timer': { title: 'Focus Timer', subtitle: 'Pomodoro sessions' },
-  '/sessions': { title: 'Session History', subtitle: 'Review past sessions' },
-  '/analytics': { title: 'Analytics', subtitle: 'Track your progress' },
-  '/settings': { title: 'Settings', subtitle: 'Configure your workspace' },
-};
 
 export const Topbar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { setCommandPaletteOpen, toggleFavorite, isFavorite, state } = useGlobal();
+  const t = useT();
+
+  // Route title mapping with translations
+  const getRouteInfo = (path: string): { title: string; subtitle?: string } => {
+    const routes: Record<string, { title: string; subtitle?: string }> = {
+      '/dashboard': { title: t.nav.dashboard, subtitle: t.dashboard.subtitle },
+      '/inbox': { title: t.nav.inbox, subtitle: t.inbox.subtitle },
+      '/tasks': { title: t.nav.tasks, subtitle: t.tasks.subtitle },
+      '/projects': { title: t.nav.projects, subtitle: t.projects.subtitle },
+      '/notes': { title: t.nav.notes, subtitle: t.notes.subtitle },
+      '/flashcards': { title: t.nav.flashcards, subtitle: t.flashcards.subtitle },
+      '/timer': { title: t.nav.timer, subtitle: t.timer.pomodoroSessions },
+      '/chat': { title: t.nav.chat, subtitle: t.chat.subtitle },
+      '/sessions': { title: t.nav.sessions, subtitle: t.sessions.subtitle },
+      '/analytics': { title: t.nav.analytics, subtitle: t.analytics.subtitle },
+      '/settings': { title: t.nav.settings, subtitle: t.settings.subtitle },
+    };
+    return routes[path] || { title: t.app.name };
+  };
 
   const currentPath = location.pathname;
-  const { title, subtitle } = routeTitles[currentPath] || { title: 'FocusLearn' };
+  const { title, subtitle } = getRouteInfo(currentPath);
   const isFav = isFavorite(currentPath);
+
+  // Personalized greeting
+  const getGreeting = (): string => {
+    const hour = new Date().getHours();
+    const name = state.settings.userName;
+    let greeting = '';
+
+    if (hour < 12) {
+      greeting = 'Good morning';
+    } else if (hour < 18) {
+      greeting = 'Good afternoon';
+    } else {
+      greeting = 'Good evening';
+    }
+
+    return name ? `${greeting}, ${name}` : greeting;
+  };
 
   // Quick actions based on current route
   const getQuickActions = () => {
@@ -46,28 +68,28 @@ export const Topbar: React.FC = () => {
         return (
           <Button size="sm" onClick={() => setCommandPaletteOpen(true)}>
             <Plus className="w-4 h-4" />
-            New Task
+            {t.tasks.newTask}
           </Button>
         );
       case '/notes':
         return (
           <Button size="sm" onClick={() => setCommandPaletteOpen(true)}>
             <Plus className="w-4 h-4" />
-            New Note
+            {t.notes.newNote}
           </Button>
         );
       case '/inbox':
         return (
           <Button size="sm" onClick={() => setCommandPaletteOpen(true)}>
             <Plus className="w-4 h-4" />
-            Quick Capture
+            {t.inbox.quickCapture}
           </Button>
         );
       case '/flashcards':
         return (
           <Button size="sm" onClick={() => setCommandPaletteOpen(true)}>
             <Plus className="w-4 h-4" />
-            New Deck
+            {t.flashcards.newDeck}
           </Button>
         );
       default:
@@ -83,12 +105,19 @@ export const Topbar: React.FC = () => {
   }, 0);
   const totalNotifications = inboxCount + (dueCards > 0 ? 1 : 0);
 
+  // Show greeting on dashboard
+  const showGreeting = currentPath === '/dashboard' || currentPath === '/';
+
   return (
     <header className="flex items-center justify-between h-14 px-4 bg-white border-b border-gray-200">
       {/* Left: Title & Breadcrumb */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold text-gray-900">{title}</h1>
+          {showGreeting && state.settings.userName ? (
+            <h1 className="text-lg font-semibold text-gray-900">{getGreeting()}</h1>
+          ) : (
+            <h1 className="text-lg font-semibold text-gray-900">{title}</h1>
+          )}
           <button
             onClick={() => toggleFavorite(currentPath)}
             className={`p-1 rounded transition-colors ${
@@ -98,7 +127,7 @@ export const Topbar: React.FC = () => {
             {isFav ? <Star className="w-4 h-4 fill-current" /> : <StarOff className="w-4 h-4" />}
           </button>
         </div>
-        {subtitle && (
+        {subtitle && !showGreeting && (
           <span className="text-sm text-gray-500 hidden md:inline">{subtitle}</span>
         )}
       </div>
@@ -111,7 +140,7 @@ export const Topbar: React.FC = () => {
           className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-md hover:bg-gray-100 hover:border-gray-300 transition-colors"
         >
           <Search className="w-4 h-4" />
-          <span>Search</span>
+          <span>{t.nav.search.replace('...', '')}</span>
           <div className="flex items-center gap-1">
             <Kbd>Ctrl</Kbd>
             <Kbd>K</Kbd>

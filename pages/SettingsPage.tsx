@@ -1,13 +1,15 @@
 /**
  * Settings Page - App Configuration
- * Timer settings, appearance, data management
+ * Timer settings, appearance, profile, language, data management
  */
 
 import React, { useRef } from 'react';
 import { useGlobal } from '../context/GlobalContext';
 import { exportData, importData } from '../lib/storage/store';
 import { isAiEnabled } from '../lib/ai/geminiClient';
-import { Card, Button, Input, Badge } from '../components/ui';
+import { useT } from '../i18n';
+import { Card, Button, Input, Badge, SegmentedControl } from '../components/ui';
+import { Theme, Language } from '../types';
 import {
   Settings,
   Timer,
@@ -18,11 +20,18 @@ import {
   AlertCircle,
   CheckCircle,
   Trash2,
+  Palette,
+  User,
+  Globe,
+  Sun,
+  Moon,
+  Monitor,
 } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
-  const { state, updateSettings, showToast } = useGlobal();
+  const { state, updateSettings, setTheme, setLanguage, setUserName, showToast } = useGlobal();
   const fileRef = useRef<HTMLInputElement>(null);
+  const t = useT();
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -32,9 +41,10 @@ export const SettingsPage: React.FC = () => {
       if (ev.target?.result) {
         const success = importData(ev.target.result as string);
         if (success) {
-          showToast('Data imported successfully', 'success');
+          showToast(t.settings.importSuccess, 'success');
+          window.location.reload();
         } else {
-          showToast('Failed to import data', 'error');
+          showToast(t.settings.importFailed, 'error');
         }
       }
     };
@@ -43,15 +53,25 @@ export const SettingsPage: React.FC = () => {
 
   const handleExport = () => {
     exportData();
-    showToast('Data exported', 'success');
+    showToast(t.settings.exportSuccess, 'success');
   };
 
   const handleClearData = () => {
-    if (window.confirm('Are you sure you want to clear all data? This cannot be undone.')) {
+    if (window.confirm(t.settings.clearConfirm)) {
       localStorage.clear();
       window.location.reload();
     }
   };
+
+  const themeOptions: { value: Theme; label: string; icon: React.ReactNode }[] = [
+    { value: 'light', label: t.settings.themeLight, icon: <Sun className="w-4 h-4" /> },
+    { value: 'dark', label: t.settings.themeDark, icon: <Moon className="w-4 h-4" /> },
+  ];
+
+  const languageOptions: { value: Language; label: string }[] = [
+    { value: 'en', label: t.settings.english },
+    { value: 'vi', label: t.settings.vietnamese },
+  ];
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
@@ -59,24 +79,97 @@ export const SettingsPage: React.FC = () => {
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <Settings className="w-6 h-6 text-indigo-600" />
-          Settings
+          {t.settings.title}
         </h1>
         <p className="text-gray-500 text-sm mt-1">
-          Configure your FocusLearn experience
+          {t.settings.subtitle}
         </p>
       </div>
+
+      {/* Profile Settings */}
+      <Card className="p-6 space-y-4">
+        <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+          <User className="w-5 h-5 text-gray-400" />
+          {t.settings.profile}
+        </h2>
+
+        <div>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">
+            {t.settings.yourName}
+          </label>
+          <Input
+            type="text"
+            value={state.settings.userName}
+            onChange={(e) => setUserName(e.target.value)}
+            placeholder={t.settings.namePlaceholder}
+            maxLength={24}
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            {t.settings.nameHint}
+          </p>
+        </div>
+      </Card>
+
+      {/* Appearance Settings */}
+      <Card className="p-6 space-y-4">
+        <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+          <Palette className="w-5 h-5 text-gray-400" />
+          {t.settings.appearance}
+        </h2>
+
+        <div>
+          <label className="text-sm font-medium text-gray-700 mb-3 block">
+            {t.settings.theme}
+          </label>
+          <div className="flex gap-3">
+            {themeOptions.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setTheme(option.value)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all ${
+                  state.settings.theme === option.value
+                    ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                    : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                }`}
+              >
+                {option.icon}
+                <span className="font-medium text-sm">{option.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </Card>
+
+      {/* Language Settings */}
+      <Card className="p-6 space-y-4">
+        <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+          <Globe className="w-5 h-5 text-gray-400" />
+          {t.settings.language}
+        </h2>
+
+        <div>
+          <label className="text-sm font-medium text-gray-700 mb-3 block">
+            {t.settings.languageSelect}
+          </label>
+          <SegmentedControl
+            options={languageOptions}
+            value={state.settings.language}
+            onChange={setLanguage}
+          />
+        </div>
+      </Card>
 
       {/* Timer Settings */}
       <Card className="p-6 space-y-4">
         <h2 className="font-semibold text-gray-900 flex items-center gap-2">
           <Timer className="w-5 h-5 text-gray-400" />
-          Timer Configuration
+          {t.settings.timerConfig}
         </h2>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="text-sm font-medium text-gray-700 mb-1 block">
-              Focus Duration (min)
+              {t.settings.focusDuration}
             </label>
             <input
               type="number"
@@ -92,7 +185,7 @@ export const SettingsPage: React.FC = () => {
 
           <div>
             <label className="text-sm font-medium text-gray-700 mb-1 block">
-              Short Break (min)
+              {t.settings.shortBreak}
             </label>
             <input
               type="number"
@@ -108,7 +201,7 @@ export const SettingsPage: React.FC = () => {
 
           <div>
             <label className="text-sm font-medium text-gray-700 mb-1 block">
-              Long Break (min)
+              {t.settings.longBreak}
             </label>
             <input
               type="number"
@@ -124,7 +217,7 @@ export const SettingsPage: React.FC = () => {
 
           <div>
             <label className="text-sm font-medium text-gray-700 mb-1 block">
-              Cycles Before Long Break
+              {t.settings.cyclesBeforeLong}
             </label>
             <input
               type="number"
@@ -138,17 +231,13 @@ export const SettingsPage: React.FC = () => {
             />
           </div>
         </div>
-
-        <p className="text-xs text-gray-400">
-          After {state.settings.timer.cyclesBeforeLongBreak} focus sessions, you'll get a {state.settings.timer.longBreakMinutes} minute break.
-        </p>
       </Card>
 
       {/* AI Features */}
       <Card className="p-6 space-y-4">
         <h2 className="font-semibold text-gray-900 flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-gray-400" />
-          AI Features
+          {t.settings.aiFeatures}
         </h2>
 
         <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
@@ -157,30 +246,30 @@ export const SettingsPage: React.FC = () => {
               <>
                 <CheckCircle className="w-5 h-5 text-green-500" />
                 <div>
-                  <p className="font-medium text-gray-900">AI Enabled</p>
-                  <p className="text-xs text-gray-500">Gemini API key configured</p>
+                  <p className="font-medium text-gray-900">{t.settings.aiEnabled}</p>
+                  <p className="text-xs text-gray-500">{t.settings.aiConfigured}</p>
                 </div>
               </>
             ) : (
               <>
                 <AlertCircle className="w-5 h-5 text-amber-500" />
                 <div>
-                  <p className="font-medium text-gray-900">AI Disabled</p>
+                  <p className="font-medium text-gray-900">{t.settings.aiDisabled}</p>
                   <p className="text-xs text-gray-500">
-                    Set VITE_GEMINI_API_KEY in your .env file
+                    {t.settings.aiMissing}
                   </p>
                 </div>
               </>
             )}
           </div>
           <Badge variant={isAiEnabled() ? 'success' : 'warning'}>
-            {isAiEnabled() ? 'Active' : 'Inactive'}
+            {isAiEnabled() ? t.settings.aiActive : t.settings.aiInactive}
           </Badge>
         </div>
 
         <p className="text-xs text-gray-400">
-          AI features include quiz generation, flashcard creation, and study coaching.
-          Get your API key from{' '}
+          {t.settings.aiDescription}{' '}
+          {t.settings.getApiKey}{' '}
           <a
             href="https://ai.google.dev/"
             target="_blank"
@@ -196,23 +285,23 @@ export const SettingsPage: React.FC = () => {
       <Card className="p-6 space-y-4">
         <h2 className="font-semibold text-gray-900 flex items-center gap-2">
           <Database className="w-5 h-5 text-gray-400" />
-          Data Management
+          {t.settings.dataManagement}
         </h2>
 
         <p className="text-sm text-gray-500">
-          Export your progress to transfer devices or keep a backup. All data is stored locally in your browser.
+          {t.settings.dataDescription}
         </p>
 
         <div className="flex flex-wrap gap-3">
           <Button variant="outline" onClick={handleExport}>
             <Download className="w-4 h-4" />
-            Export Data
+            {t.settings.exportData}
           </Button>
 
           <div className="relative">
             <Button variant="outline" onClick={() => fileRef.current?.click()}>
               <Upload className="w-4 h-4" />
-              Import Data
+              {t.settings.importData}
             </Button>
             <input
               type="file"
@@ -225,34 +314,34 @@ export const SettingsPage: React.FC = () => {
 
           <Button variant="danger" onClick={handleClearData}>
             <Trash2 className="w-4 h-4" />
-            Clear All Data
+            {t.settings.clearData}
           </Button>
         </div>
 
         <div className="text-xs text-gray-400 space-y-1 pt-2">
-          <p>Storage used: ~{(JSON.stringify(state).length / 1024).toFixed(1)} KB</p>
-          <p>Schema version: {state.schemaVersion}</p>
+          <p>{t.settings.storageUsed}: ~{(JSON.stringify(state).length / 1024).toFixed(1)} KB</p>
+          <p>{t.settings.schemaVersion}: {state.schemaVersion}</p>
         </div>
       </Card>
 
       {/* Stats Summary */}
       <Card className="p-6">
-        <h2 className="font-semibold text-gray-900 mb-4">Data Summary</h2>
+        <h2 className="font-semibold text-gray-900 mb-4">{t.settings.dataSummary}</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div>
-            <p className="text-gray-500">Tasks</p>
+            <p className="text-gray-500">{t.tasks.title}</p>
             <p className="text-xl font-bold text-gray-900">{state.tasks.length}</p>
           </div>
           <div>
-            <p className="text-gray-500">Notes</p>
+            <p className="text-gray-500">{t.notes.title}</p>
             <p className="text-xl font-bold text-gray-900">{state.notes.length}</p>
           </div>
           <div>
-            <p className="text-gray-500">Flashcard Decks</p>
+            <p className="text-gray-500">{t.flashcards.title}</p>
             <p className="text-xl font-bold text-gray-900">{state.decks.length}</p>
           </div>
           <div>
-            <p className="text-gray-500">Sessions</p>
+            <p className="text-gray-500">{t.sessions.title}</p>
             <p className="text-xl font-bold text-gray-900">{state.sessions.length}</p>
           </div>
         </div>
@@ -260,7 +349,7 @@ export const SettingsPage: React.FC = () => {
 
       {/* Footer */}
       <div className="text-center text-xs text-gray-400 pt-4">
-        <p>FocusLearn v3.0 - Study OS</p>
+        <p>FocusLearn v3.0 - {t.app.tagline}</p>
         <p className="mt-1">Built with React, TypeScript, and Tailwind CSS</p>
       </div>
     </div>

@@ -15,7 +15,7 @@ import {
 
 const STORAGE_KEY = 'focuslearn_v3';
 const LEGACY_KEY = 'focusLearnPlus_v2';
-const CURRENT_SCHEMA_VERSION = 3;
+const CURRENT_SCHEMA_VERSION = 4;
 
 // Default projects (subjects)
 const DEFAULT_PROJECTS: Project[] = [
@@ -76,6 +76,8 @@ function getDefaultState(): AppState {
       theme: 'light',
       sidebarCollapsed: false,
       defaultProjectId: null,
+      userName: '',
+      language: 'en',
     },
     tasks: [],
     projects: DEFAULT_PROJECTS,
@@ -85,6 +87,8 @@ function getDefaultState(): AppState {
     decks: [],
     sessions: [],
     achievements: DEFAULT_ACHIEVEMENTS,
+    conversations: [],
+    activeConversationId: null,
     lastActiveRoute: '/dashboard',
     favorites: ['/dashboard', '/timer', '/tasks'],
   };
@@ -186,16 +190,46 @@ function migrateFromV2(legacy: LegacyAppData): AppState {
   };
 }
 
+// Migrate from v3 to v4 (add conversations, userName, language)
+function migrateFromV3(oldState: any): AppState {
+  const defaultState = getDefaultState();
+  return {
+    ...oldState,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    settings: {
+      ...oldState.settings,
+      userName: oldState.settings?.userName || '',
+      language: oldState.settings?.language || 'en',
+    },
+    conversations: oldState.conversations || [],
+    activeConversationId: oldState.activeConversationId || null,
+    // Migrate existing sessions to include new fields
+    sessions: (oldState.sessions || []).map((s: any) => ({
+      ...s,
+      mode: s.mode || 'timed',
+      plannedDurationSeconds: s.plannedDurationSeconds ?? s.durationSeconds,
+      focusRating: s.focusRating ?? null,
+    })),
+  };
+}
+
 // Load state from localStorage
 export function loadState(): AppState {
   try {
-    // First check for new v3 data
-    const v3Data = localStorage.getItem(STORAGE_KEY);
-    if (v3Data) {
-      const parsed = JSON.parse(v3Data) as AppState;
+    // First check for existing data
+    const storedData = localStorage.getItem(STORAGE_KEY);
+    if (storedData) {
+      const parsed = JSON.parse(storedData);
       // Ensure we have current schema version
       if (parsed.schemaVersion === CURRENT_SCHEMA_VERSION) {
-        return parsed;
+        return parsed as AppState;
+      }
+      // Migrate from v3 to v4
+      if (parsed.schemaVersion === 3) {
+        console.log('Migrating from v3 schema...');
+        const migrated = migrateFromV3(parsed);
+        saveState(migrated);
+        return migrated;
       }
     }
 

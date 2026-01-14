@@ -531,3 +531,98 @@ export const Kbd: React.FC<KbdProps> = ({ children }) => {
     </kbd>
   );
 };
+
+// ============================================
+// Toggle / Switch Component
+// ============================================
+interface ToggleProps {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label?: string;
+  disabled?: boolean;
+}
+
+export const Toggle: React.FC<ToggleProps> = ({ checked, onChange, label, disabled = false }) => {
+  return (
+    <label className={`flex items-center gap-3 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        disabled={disabled}
+        onClick={() => !disabled && onChange(!checked)}
+        className={`relative w-11 h-6 rounded-full transition-colors ${
+          checked ? 'bg-indigo-600' : 'bg-gray-200'
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+            checked ? 'translate-x-5' : 'translate-x-0'
+          }`}
+        />
+      </button>
+      {label && <span className="text-sm text-gray-700">{label}</span>}
+    </label>
+  );
+};
+
+// ============================================
+// Segmented Control Component
+// ============================================
+interface SegmentedControlProps<T extends string> {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+  fullWidth?: boolean;
+}
+
+export function SegmentedControl<T extends string>({
+  options,
+  value,
+  onChange,
+  fullWidth = false,
+}: SegmentedControlProps<T>) {
+  return (
+    <div className={`inline-flex p-1 bg-gray-100 rounded-lg ${fullWidth ? 'w-full' : ''}`}>
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          className={`flex-1 px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+            value === opt.value
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ============================================
+// Textarea Component
+// ============================================
+interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label?: string;
+  error?: string;
+}
+
+export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
+  ({ label, error, className = '', ...props }, ref) => {
+    return (
+      <div className="space-y-1">
+        {label && <label className="text-sm font-medium text-gray-700">{label}</label>}
+        <textarea
+          ref={ref}
+          className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder:text-gray-400 resize-none ${
+            error ? 'border-red-500' : ''
+          } ${className}`}
+          {...props}
+        />
+        {error && <p className="text-xs text-red-600">{error}</p>}
+      </div>
+    );
+  }
+);

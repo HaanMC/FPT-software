@@ -122,6 +122,9 @@ export interface Session {
   phaseCount: number;
   breakPlan: BreakPlan[];
   notes: string;
+  mode: SessionMode;
+  plannedDurationSeconds: number | null;
+  focusRating: number | null;
 }
 
 // ============================================
@@ -153,6 +156,8 @@ export interface QuizSession {
 // Settings Types
 // ============================================
 
+export type Language = 'en' | 'vi';
+
 export interface TimerSettings {
   focusMinutes: number;
   shortBreakMinutes: number;
@@ -168,7 +173,44 @@ export interface AppSettings {
   theme: Theme;
   sidebarCollapsed: boolean;
   defaultProjectId: string | null;
+  userName: string;
+  language: Language;
 }
+
+// ============================================
+// AI Chat Types
+// ============================================
+
+export type ChatMessageRole = 'user' | 'assistant' | 'system';
+
+export interface ChatMessage {
+  id: string;
+  role: ChatMessageRole;
+  content: string;
+  createdAt: string;
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatContextOptions {
+  includeTasks: boolean;
+  includeProject: boolean;
+  includeQuizMistakes: boolean;
+  includeDistractions: boolean;
+  includeNotes: boolean;
+}
+
+// ============================================
+// Session Mode Types
+// ============================================
+
+export type SessionMode = 'timed' | 'open';
 
 // ============================================
 // Achievement Types (Simplified - no coins)
@@ -206,6 +248,10 @@ export interface AppState {
   // Achievements
   achievements: Achievement[];
 
+  // AI Chat
+  conversations: Conversation[];
+  activeConversationId: string | null;
+
   // UI State (persisted)
   lastActiveRoute: string;
   favorites: string[]; // Route paths
@@ -225,6 +271,7 @@ export interface SessionConfig {
   breakMinutes: number;
   projectId?: string;
   linkedTaskId?: string;
+  mode: SessionMode;
 }
 
 // ============================================

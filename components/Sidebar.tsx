@@ -5,6 +5,7 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useGlobal } from '../context/GlobalContext';
+import { useT } from '../i18n';
 import {
   LayoutDashboard,
   Inbox,
@@ -20,7 +21,7 @@ import {
   ChevronRight,
   Star,
   Search,
-  Command,
+  MessageCircle,
   Sparkles,
 } from 'lucide-react';
 import { Badge, Kbd } from './ui';
@@ -65,12 +66,13 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, collapsed }) 
 
 export const Sidebar: React.FC = () => {
   const { state, updateState, setCommandPaletteOpen } = useGlobal();
+  const t = useT();
   const collapsed = state.settings.sidebarCollapsed;
 
   // Calculate badges
   const inboxCount = state.inbox.length;
   const todayTasks = state.tasks.filter(
-    (t) => t.status !== 'done' && t.dueDate === new Date().toISOString().split('T')[0]
+    (task) => task.status !== 'done' && task.dueDate === new Date().toISOString().split('T')[0]
   ).length;
   const dueCards = state.decks.reduce((acc, deck) => {
     const today = new Date().toISOString().split('T')[0];
@@ -96,7 +98,7 @@ export const Sidebar: React.FC = () => {
             <div className="w-7 h-7 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold text-gray-900">FocusLearn</span>
+            <span className="font-bold text-gray-900">{t.app.name}</span>
           </div>
         )}
         <button
@@ -115,7 +117,7 @@ export const Sidebar: React.FC = () => {
             className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-500 bg-white border border-gray-200 rounded-md hover:bg-gray-50 hover:border-gray-300 transition-colors"
           >
             <Search className="w-4 h-4" />
-            <span className="flex-1 text-left">Search...</span>
+            <span className="flex-1 text-left">{t.nav.search}</span>
             <Kbd>Ctrl</Kbd>
             <Kbd>K</Kbd>
           </button>
@@ -125,8 +127,8 @@ export const Sidebar: React.FC = () => {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
         {/* Main */}
-        <NavItem to="/dashboard" icon={<LayoutDashboard size={18} />} label="Dashboard" collapsed={collapsed} />
-        <NavItem to="/inbox" icon={<Inbox size={18} />} label="Inbox" badge={inboxCount} collapsed={collapsed} />
+        <NavItem to="/dashboard" icon={<LayoutDashboard size={18} />} label={t.nav.dashboard} collapsed={collapsed} />
+        <NavItem to="/inbox" icon={<Inbox size={18} />} label={t.nav.inbox} badge={inboxCount} collapsed={collapsed} />
 
         {/* Divider */}
         {!collapsed && (
@@ -136,10 +138,10 @@ export const Sidebar: React.FC = () => {
         )}
 
         {/* Work */}
-        <NavItem to="/tasks" icon={<CheckSquare size={18} />} label="Tasks" badge={todayTasks} collapsed={collapsed} />
-        <NavItem to="/projects" icon={<FolderKanban size={18} />} label="Projects" collapsed={collapsed} />
-        <NavItem to="/notes" icon={<FileText size={18} />} label="Notes" collapsed={collapsed} />
-        <NavItem to="/flashcards" icon={<GraduationCap size={18} />} label="Flashcards" badge={dueCards} collapsed={collapsed} />
+        <NavItem to="/tasks" icon={<CheckSquare size={18} />} label={t.nav.tasks} badge={todayTasks} collapsed={collapsed} />
+        <NavItem to="/projects" icon={<FolderKanban size={18} />} label={t.nav.projects} collapsed={collapsed} />
+        <NavItem to="/notes" icon={<FileText size={18} />} label={t.nav.notes} collapsed={collapsed} />
+        <NavItem to="/flashcards" icon={<GraduationCap size={18} />} label={t.nav.flashcards} badge={dueCards} collapsed={collapsed} />
 
         {/* Divider */}
         {!collapsed && (
@@ -149,14 +151,15 @@ export const Sidebar: React.FC = () => {
         )}
 
         {/* Focus */}
-        <NavItem to="/timer" icon={<Timer size={18} />} label="Timer" collapsed={collapsed} />
-        <NavItem to="/sessions" icon={<History size={18} />} label="Sessions" collapsed={collapsed} />
-        <NavItem to="/analytics" icon={<BarChart3 size={18} />} label="Analytics" collapsed={collapsed} />
+        <NavItem to="/timer" icon={<Timer size={18} />} label={t.nav.timer} collapsed={collapsed} />
+        <NavItem to="/chat" icon={<MessageCircle size={18} />} label={t.nav.chat} collapsed={collapsed} />
+        <NavItem to="/sessions" icon={<History size={18} />} label={t.nav.sessions} collapsed={collapsed} />
+        <NavItem to="/analytics" icon={<BarChart3 size={18} />} label={t.nav.analytics} collapsed={collapsed} />
       </nav>
 
       {/* Footer */}
       <div className="px-2 py-2 border-t border-gray-200">
-        <NavItem to="/settings" icon={<Settings size={18} />} label="Settings" collapsed={collapsed} />
+        <NavItem to="/settings" icon={<Settings size={18} />} label={t.nav.settings} collapsed={collapsed} />
       </div>
     </aside>
   );

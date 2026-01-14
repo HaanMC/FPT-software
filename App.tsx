@@ -32,6 +32,7 @@ import QuizPage from './pages/QuizPage';
 import SessionsPage from './pages/SessionsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import SettingsPage from './pages/SettingsPage';
+import ChatPage from './pages/ChatPage';
 
 const App: React.FC = () => {
   return (
@@ -61,9 +62,12 @@ const App: React.FC = () => {
             {/* Settings */}
             <Route path="settings" element={<SettingsPage />} />
 
+            {/* AI Chat */}
+            <Route path="chat" element={<ChatPage />} />
+
             {/* Legacy redirects */}
             <Route path="shop" element={<Navigate to="/" replace />} />
-            <Route path="coach" element={<Navigate to="/" replace />} />
+            <Route path="coach" element={<Navigate to="/chat" replace />} />
           </Route>
 
           {/* Catch all - redirect to dashboard */}

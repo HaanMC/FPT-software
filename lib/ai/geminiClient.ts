@@ -273,30 +273,88 @@ Give 3 short, actionable study tips.`;
 }
 
 /**
- * Chat with AI coach
+ * Chat message type for conversations
  */
-export async function chatWithCoach(message: string): Promise<string> {
+interface ChatMessageInput {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+/**
+ * Send a chat message with full conversation context
+ */
+export async function sendChatMessage(
+  messages: ChatMessageInput[],
+  options: {
+    language?: 'en' | 'vi';
+    context?: string;
+  } = {}
+): Promise<string> {
   if (!isAiEnabled()) {
-    return "AI is currently unavailable. Please add your Gemini API key to environment variables.";
+    return options.language === 'vi'
+      ? "AI hiện không khả dụng. Vui lòng thêm API key Gemini vào biến môi trường."
+      : "AI is currently unavailable. Please add your Gemini API key to environment variables.";
   }
 
   const ai = getAiClient();
   if (!ai) {
-    return "AI is currently unavailable.";
+    return options.language === 'vi'
+      ? "AI hiện không khả dụng."
+      : "AI is currently unavailable.";
   }
+
+  const languageInstruction = options.language === 'vi'
+    ? 'Respond in Vietnamese. '
+    : 'Respond in English. ';
+
+  const systemPrompt = `You are a helpful, focused study coach for students using FocusLearn.
+${languageInstruction}
+Your role:
+- Help students understand concepts, create study plans, and stay motivated
+- Provide structured, practical answers
+- Ask clarifying questions if the request is ambiguous
+- Keep responses concise but thorough
+
+Rules:
+- Do NOT provide medical, therapy, or mental health advice - suggest professional help instead
+- Do NOT collect personal data beyond what's needed for study context
+- Stay focused on academic and learning topics
+- Be encouraging but honest
+
+${options.context ? `Student context:\n${options.context}\n` : ''}`;
+
+  // Build conversation for Gemini
+  const conversationParts = messages.map(msg => {
+    if (msg.role === 'user') {
+      return { role: 'user', parts: [{ text: msg.content }] };
+    } else {
+      return { role: 'model', parts: [{ text: msg.content }] };
+    }
+  });
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.0-flash',
-      contents: `You are a helpful study coach.
-User asks: "${message}".
-Keep answer under 50 words. Be encouraging.
-Do not give medical advice.`,
+      contents: [
+        { role: 'user', parts: [{ text: systemPrompt }] },
+        { role: 'model', parts: [{ text: 'I understand. I am ready to help as a study coach.' }] },
+        ...conversationParts,
+      ],
     });
-    return response.text || "I couldn't think of a response.";
+    return response.text || (options.language === 'vi' ? "Tôi không thể trả lời." : "I couldn't generate a response.");
   } catch (e) {
-    return "Sorry, I'm having trouble connecting right now.";
+    console.error('Chat error:', e);
+    return options.language === 'vi'
+      ? "Xin lỗi, tôi đang gặp sự cố kết nối."
+      : "Sorry, I'm having trouble connecting right now.";
   }
+}
+
+/**
+ * Chat with AI coach (legacy function for compatibility)
+ */
+export async function chatWithCoach(message: string): Promise<string> {
+  return sendChatMessage([{ role: 'user', content: message }]);
 }
 
 /**
